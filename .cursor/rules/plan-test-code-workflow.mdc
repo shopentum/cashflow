@@ -1,0 +1,36 @@
+---
+description: Enforce Plan -> Test -> Code workflow for implementation tasks
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Plan -> Test -> Code
+
+- Do not jump straight to coding.
+- Start from an explicit written plan (scope, files, risks, rollback).
+
+Required order:
+1) PLAN
+- define scope, touched files, risks, rollback.
+- for small tasks use MINI-PLAN (intent + expected result + files).
+2) TEST
+- define checks/tests before coding.
+- run verification after changes.
+3) CODE
+- implement minimal diff only.
+
+Output Contract:
+1. PLAN SUMMARY
+- scope + files + risks
+2. TEST STRATEGY
+- commands/checks + expected signal
+3. CODE ACTIONS
+- exact edits + rollback note
+4. DONE CRITERIA
+- explicit test evidence (what passed)
+
+Never:
+- code first when plan is unclear,
+- mark task done without test/check evidence (`no test = no done`),
+- skip verification commands after substantive edits.
+

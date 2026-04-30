@@ -1,0 +1,64 @@
+# Nasadenie omega-cashflow: samostatný repozitár + subdoména (Vercel + Websupport DNS)
+
+Tento návod predpokladá doménu **aifreelancer.sk** u Websupport a hlavný projekt na **GitHub + Vercel**. Cashflow beží ako **druhý repozitár** a **druhý Vercel projekt**, dostupný na napr. **cashflow.aifreelancer.sk**.
+
+## 1. Repozitár na GitHube
+
+1. Vytvor nový repozitár (napr. `omega-cashflow` alebo `aifreelancer-cashflow`).
+2. Lokálne v koreňovom priečinku projektu (ak ešte nie je git):
+
+   ```bash
+   git init
+   git branch -M main
+   git remote add origin https://github.com/TVOJ-UCET/NAZOV-REPA.git
+   git add .
+   git commit -m "chore: initial omega-cashflow app"
+   git push -u origin main
+   ```
+
+3. Over, že v repozitári sú aspoň: `package.json`, `vite.config.ts`, `src/`, `vercel.json`.
+
+## 2. Nový projekt na Verceli
+
+1. Prihlás sa na [vercel.com](https://vercel.com), **Add New → Project**.
+2. **Import** repozitára z GitHubu (vyber ten s cashflow).
+3. Nastavenia buildu (Vercel často uhádne sám vďaka `vercel.json` a Vite):
+   - **Framework Preset:** Vite (alebo „Other“ s build command nižšie).
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+   - **Install Command:** `npm install`
+4. **Deploy**. Po dokončení máš URL typu `nazov-projektu.vercel.app`.
+
+## 3. Subdoména v projekte na Verceli
+
+1. V projekte otvor **Settings → Domains**.
+2. Klikni **Add** a zadaj napr. `cashflow.aifreelancer.sk` (alebo iný prefix, ktorý chceš).
+3. Vercel zobrazí **čo presne máš pridať do DNS** (CNAME alebo A – ber vždy **aktuálne hodnoty z Vercelu**, nie staré návody z internetu).
+
+Typicky pre subdoménu:
+
+- Typ: **CNAME**
+- **Host** (u Websupport niekedy „Názov“ / „Prefix“): `cashflow`
+- **Cieľ / hodnota:** presne čo ukáže Vercel (často varianta s `vercel-dns`)
+
+Ulož záznam u Websupport a počkaj na propagáciu (minúty až hodiny). Vercel sám vystaví **HTTPS**.
+
+### Konflikty DNS
+
+- Pre host `cashflow` nesmú byť **dva rôzne záznamy** (napr. CNAME aj A naraz).
+- Ak tam už niečo máš z iného experimentu, vymaž starý záznam alebo ho uprav podľa Vercelu.
+
+## 4. Kontrola po nasadení
+
+- Otvor `https://cashflow.aifreelancer.sk` (alebo tvoju subdoménu).
+- Ak stránka nenačíta JS/CSS: skontroluj v DevTools → Network; over, že build na Verceli prebehol úspešne a že doména v panely Vercelu je **Valid** (zelená).
+
+## 5. Ďalšie deploye
+
+Každý **push do `main`** (alebo vetvy, ktorú máš v projekte nastavenú ako Production) spustí nový deploy. Preview URL dostaneš pri **pull requestoch**, ak to máš v tíme zapnuté.
+
+## Poznámky
+
+- **Websupport** = správa DNS pre `aifreelancer.sk`. Hosting statickej appky je **Vercel** (`dist/` z `npm run build`).
+- MVP cashflow používa **localStorage** v prehliadači; údaje sa neodosielajú na server.
+- Viacero Vercel projektov na jednej doméne je bežné: apex / `www` na hlavný projekt, subdoména na cashflow.

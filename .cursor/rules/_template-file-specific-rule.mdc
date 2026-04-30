@@ -1,0 +1,35 @@
+---
+description: Template for file-specific Cursor rule packs
+globs: src/**/*
+alwaysApply: false
+---
+
+# Rule Template - File Specific
+
+Use this as a starter and customize:
+- `description`: what the rule enforces.
+- `globs`: narrow patterns for surgical activation.
+- Keep rule concise and actionable.
+
+Recommended structure:
+1) Scope (where it applies / where not)
+2) Non-negotiable guardrails
+3) Data integrity rules (`data_gap`, no fabricated values)
+4) UI/data ownership boundary (Lens Integrity)
+5) Output Contract (exact response shape)
+6) Acceptance hints for outputs/changes
+
+Output Contract mini-template:
+- Required sections/order:
+  1. ...
+  2. ...
+  3. ...
+- Max items per section:
+  - ...
+- No-signal behavior:
+  - return `no_major_change`
+- Never:
+  - ...
+
+Replace this template with domain-specific content before production use.
+

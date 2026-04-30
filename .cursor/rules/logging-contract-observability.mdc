@@ -1,0 +1,30 @@
+---
+description: Enforce logging contract for critical operations and debug paths
+globs: src/services/**/*.ts
+alwaysApply: false
+---
+
+# Logging Contract - Observability
+
+For critical operations and error boundaries, use structured logs with:
+- `event`
+- `status` (`success|error`)
+- `input`
+- `output`
+- `error`
+- `expected`
+- `actual`
+- `timestamp` (ISO-8601 UTC)
+
+Output Contract:
+1. LOG PLAN
+- where logs will be added and why
+2. LOG SHAPE
+- fields used from the logging contract
+3. VERIFY
+- how logs confirm expected vs actual
+
+Never:
+- log secrets/tokens/credentials,
+- emit non-structured logs for critical operations.
+

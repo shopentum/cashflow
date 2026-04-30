@@ -1,0 +1,23 @@
+---
+description: Quality gate for authoring new rule packs (mandatory output contract)
+globs: .cursor/rules/*.mdc
+alwaysApply: false
+---
+
+# Rules Authoring - Output Contract Gate
+
+When creating or updating any domain rule pack, it is valid only if it includes:
+- `## Output Contract`
+- explicit section order (or per-card field order),
+- max item limits,
+- `If no significant signal` fallback with `no_major_change`,
+- `Never:` list with at least 2 forbidden patterns.
+
+For overlapping packs, require explicit precedence sentence:
+- either `Priority override` or `subordinate to ...`.
+
+Reject incomplete rule drafts:
+- no output contract,
+- ambiguous output shape,
+- missing no-signal behavior.
+

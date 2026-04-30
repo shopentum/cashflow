@@ -1,0 +1,55 @@
+---
+description: Lightweight debug protocol for fast root-cause isolation
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Debug Protocol (Light)
+
+When bug root cause is unclear:
+1) Reproduce
+- capture exact failing path and expected vs actual behavior.
+2) Instrument
+- add targeted logging around suspected boundary (input -> transform -> output).
+3) Validate
+- run and inspect logs; isolate first wrong value.
+4) Fix
+- apply minimal patch at root cause, then remove/trim temporary noisy logs.
+
+Logging Contract (minimum for critical operations):
+```json
+{
+  "event": "operation_name",
+  "status": "success | error",
+  "input": "...",
+  "output": "...",
+  "error": "...",
+  "expected": "...",
+  "actual": "...",
+  "timestamp": "ISO-8601"
+}
+```
+
+At error boundaries always include:
+- expected vs actual,
+- operation identifier (`event`),
+- stable timestamp.
+
+Output Contract:
+1. REPRO
+- short failing scenario
+2. SIGNALS
+- key log findings
+3. ROOT CAUSE
+- one concrete cause
+4. FIX + VERIFY
+- patch summary and checks run
+
+If no clear signal:
+- return `no_major_change` + what logs/data are missing.
+
+Never:
+- broad blind refactor during debugging,
+- claim fix without rerun/verification,
+- log only vague messages without operation context.
+

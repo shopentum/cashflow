@@ -1,0 +1,14 @@
+---
+description: Po každom dokončení úlohy ponúkni commit a push zmen
+alwaysApply: true
+---
+
+# Commit & Push Workflow
+
+Po každom dokončení úlohy alebo sady zmien:
+
+1. **Skontroluj** `git status` – či sú necommitnuté zmeny
+2. **Ponúkni** používateľovi: „Môžem tieto zmeny commitnúť a pushnúť?“ alebo vykonaj commit+push ak má explicitný súhlas
+3. **Používaj** zmysluplné commit messages (napr. `fix(css): ...`, `feat(auth): ...`)
+
+Používateľ chce, aby sme na commit a push nikdy nezabudli.

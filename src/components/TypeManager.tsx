@@ -1,4 +1,9 @@
 import type { FormEvent } from "react";
+import type {
+  CashflowAppState,
+  PaymentType,
+  PaymentTypeKind,
+} from "@/types/finance";
 
 type Props = {
   state: CashflowAppState;

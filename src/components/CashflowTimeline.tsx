@@ -13,8 +13,8 @@ export function CashflowTimeline({ state }: Props) {
     <section className="panel">
       <h2>Časová os / kalendár</h2>
       <p className="muted">
-        Zobrazí prichádzajúce platby a zostatok po udalostiach. Skeleton —
-        zoznam sa vyplní po implementácii timeline v engine.
+        Od dátumu „dnes“ dopredu: zobrazené sú transakcie a projekcia zostatku po
+        každej udalosti.
       </p>
       {points.length === 0 ? (
         <p className="empty-hint">Zatiaľ žiadne body — pridaj transakcie alebo plány.</p>

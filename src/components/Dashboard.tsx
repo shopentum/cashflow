@@ -29,8 +29,9 @@ export function Dashboard({
     <section className="panel">
       <h2>Prehľad</h2>
       <p className="muted">
-        Odpovede na otázky o zostatku, fixných platbách a zostávajúcej rezerve
-        doplníme výpočtom — skeleton zatiaľ ukazuje vstupy a štruktúru.
+        Hodnoty vychádzajú zo zostatku, rezervy a zaradených transakcií v aktuálnom
+        kalendárnom mesiaci (stav <code className="muted">skipped</code> /{" "}
+        <code className="muted">moved</code> sa do hotovosti nepočítajú).
       </p>
 
       <div className="grid metrics">
@@ -92,15 +93,33 @@ export function Dashboard({
       </div>
 
       <div className="subsection">
-        <h3>Čiastočný výstup motorov (WIP)</h3>
+        <h3>Motor — mesiac</h3>
         <ul className="kv">
           <li>
-            <span>Príjem tento mesiac (engine)</span>
+            <span>Príjem (zarátaný)</span>
             <span>{formatMoneyEUR(summary.totalIncomeThisMonth)}</span>
           </li>
           <li>
-            <span>Strop na splátky (podľa %)</span>
+            <span>Fixné výdavky</span>
+            <span>{formatMoneyEUR(summary.totalFixedExpensesThisMonth)}</span>
+          </li>
+          <li>
+            <span>Flexibilné / ostatné</span>
+            <span>{formatMoneyEUR(summary.totalFlexibleExpensesThisMonth)}</span>
+          </li>
+          <li>
+            <span>Splátky (ledger alebo rozpočet dlhov)</span>
+            <span>{formatMoneyEUR(summary.totalPlannedDebtPayments)}</span>
+          </li>
+          <li>
+            <span>Strop na dlhy (%)</span>
             <span>{formatMoneyEUR(debtAlloc.debtBudgetCap)}</span>
+          </li>
+          <li>
+            <span>Likvidita — dní do rezervy (hrubý odhad)</span>
+            <span>
+              {summary.daysToZero === null ? "—" : `${summary.daysToZero} dní`}
+            </span>
           </li>
         </ul>
       </div>

@@ -23,3 +23,44 @@ export function addDaysISO(isoDate: string, days: number): string {
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Lokálny dátum v tvare YYYY-MM-DD (bez časových pásov UTC). */
+export function dateToLocalISO(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Inkluzívny kalendárny mesiac lokálnej časovej zóny. */
+export function calendarMonthBoundsLocal(ref: Date = new Date()): {
+  start: string;
+  end: string;
+} {
+  const y = ref.getFullYear();
+  const m = ref.getMonth();
+  const start = `${y}-${pad(m + 1)}-01`;
+  const last = new Date(y, m + 1, 0).getDate();
+  const end = `${y}-${pad(m + 1)}-${pad(last)}`;
+  return { start, end };
+}
+
+/** Inkluzívne okno [today, today + days - 1] v lokálnom kalendári. */
+export function rollingWindowBoundsInclusive(
+  ref: Date = new Date(),
+  days: number,
+): { start: string; end: string } {
+  const clamped = Math.max(1, Math.floor(days));
+  const today = dateToLocalISO(ref);
+  const end = addDaysISO(today, clamped - 1);
+  return { start: today, end };
+}
+
+export function isDateInInclusiveRange(
+  date: string,
+  start: string,
+  end: string,
+): boolean {
+  return date >= start && date <= end;
+}

@@ -16,9 +16,20 @@ export interface DebtAllocationResult {
   totalAllocated: number;
 }
 
+function debtTargetAmount(d: Debt, incomeThisMonth: number): number {
+  if (d.preferredMonthlyAmount > 0) {
+    return roundMoney(d.preferredMonthlyAmount);
+  }
+  if (d.preferredMonthlyPercent != null && Number.isFinite(d.preferredMonthlyPercent)) {
+    return roundMoney((incomeThisMonth * d.preferredMonthlyPercent) / 100);
+  }
+  return 0;
+}
+
 /**
- * Skeleton: rozpočet z % príjmu; manuálne override ešte nie sú v stave.
- * Plná implementácia: docs/mvp_cashflow_spec.md (DEBT ALLOCATION ENGINE).
+ * Rozpočet splátok: strop `incomeThisMonth * debtBudgetPercent / 100`,
+ * rozdelenie podľa priority (1 = najvyššia), postupné „čerpanie“ stropu.
+ * Manuálne override v stave zatiaľ nie sú — pole `manualOverride` ostáva null.
  */
 export function allocateDebts(
   state: CashflowAppState,
@@ -26,18 +37,27 @@ export function allocateDebts(
 ): DebtAllocationResult {
   const cap = roundMoney((incomeThisMonth * state.debtBudgetPercent) / 100);
   const active = state.debts.filter((d: Debt) => d.status === "active");
-  const lines: DebtAllocationLine[] = active.map((d) => ({
-    debtId: d.id,
-    name: d.name,
-    fromBudget: Math.min(d.preferredMonthlyAmount, cap / Math.max(active.length, 1)),
-    manualOverride: null,
-    applied: d.preferredMonthlyAmount,
-  }));
+  const sorted = [...active].sort((a, b) => a.priority - b.priority);
+
+  let remainingCap = cap;
+  const lines: DebtAllocationLine[] = sorted.map((d) => {
+    const target = debtTargetAmount(d, incomeThisMonth);
+    const applied = roundMoney(Math.min(target, Math.max(0, remainingCap)));
+    remainingCap = roundMoney(remainingCap - applied);
+    return {
+      debtId: d.id,
+      name: d.name,
+      fromBudget: target,
+      manualOverride: null,
+      applied,
+    };
+  });
+
   const totalAllocated = roundMoney(lines.reduce((s, l) => s + l.applied, 0));
   return {
     incomeThisMonth,
     debtBudgetCap: cap,
     lines,
     totalAllocated,
-};
+  };
 }

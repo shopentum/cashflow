@@ -27,6 +27,25 @@ Tento návod predpokladá doménu **aifreelancer.sk** u Websupport a hlavný pro
 3. Build musí zostať ako v `vercel.json`: Framework **Vite**, `npm run build`, Output **`dist`**.
 4. Po prvom úspechu uvidíš v záložke **Deployments** aspoň jeden záznam; pri chybe otvor log buildu (**Building** → červený riadok).
 
+### Doména vs. priečinok (`Root Directory`)
+
+Na Verceli sú to **dve oddelené veci**:
+
+| Čo nastavuješ | Čo to robí |
+|---------------|------------|
+| **Root Directory** (pri importe rozbaľ „Build and Output Settings“, alebo neskôr **Project → Settings → General → Root Directory**) | Z ktorého **podpriečinka v repozitári** Vercel spustí `npm install` / `npm run build` — musí tam byť **`package.json`** tejto appky (Vite). |
+| **Domains** (**Settings → Domains**) | Ktorá **verejná URL** (napr. `cashflow.aifreelancer.sk` alebo `*.vercel.app`) ide na výstup buildu. **Nenahrádza výber priečinka.** |
+
+Pri **samostatnom** repe `shopentum/cashflow` (cashflow ako jediná app v koreni) má byť Root Directory **`./`** alebo pole **nechať prázdne** — žiadny podpriečinok.
+
+Ak máš na GitHu **jeden veľký mono‑repo pre aifreelancer.sk** (viac priečinkov s vlastnými `package.json`):
+
+1. Vytvor **samostatný Vercel projekt** len pre cashflow (môže byť ten istý Git repo ako hlavný web).
+2. V **Root Directory** zadaj cestu k priečinku tej appky, napr. `apps/cashflow` alebo `omega-cashflow` — presne kde leží `package.json` tohto projektu.
+3. Doménu pridáš až potom (**Settings → Domains**): napr. `cashflow.aifreelancer.sk` na tomto projekte; hlavná stránka môže zostať na druhom projekte s iným Root a na `www` / apex.
+
+Pri importe často prvá obrazovka zdôrazní **doménu náhľadu** — **`Root Directory` je inde**: pred Deploy rozbaľ **Configure Project / Build and Output Settings**, tam sa zadáva priečinok.
+
 ## 2. Nový projekt na Verceli
 
 1. Prihlás sa na [vercel.com](https://vercel.com), **Add New → Project**.

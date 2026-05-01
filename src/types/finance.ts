@@ -72,6 +72,14 @@ export interface PaymentPlanItem {
   note: string;
 }
 
+/**
+ * Mesačný zámer k flexibilnému dlhu (YYYY-MM).
+ * Pevné dlhy (`dueFlexibility: fixed`) plán ignorujú — vždy sa berie preferovaná splátka.
+ */
+export type DebtMonthlyPlan =
+  | { debtId: string; month: string; mode: "skip" }
+  | { debtId: string; month: string; mode: "custom"; customAmount: number };
+
 /** App state persisted in localStorage (MVP). */
 export interface CashflowAppState {
   schemaVersion: number;
@@ -83,4 +91,6 @@ export interface CashflowAppState {
   paymentTypes: PaymentType[];
   debts: Debt[];
   paymentPlanItems: PaymentPlanItem[];
+  /** Voliteľné mesačné úpravy len pre `dueFlexibility: flexible` dlhy. */
+  debtMonthlyPlans: DebtMonthlyPlan[];
 }

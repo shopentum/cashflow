@@ -6,7 +6,7 @@ import { SimulationPanel } from "@/components/SimulationPanel";
 import { TransactionForm } from "@/components/TransactionForm";
 import { TypeManager } from "@/components/TypeManager";
 import { loadState, saveState } from "@/services/storageService";
-import type { CashflowAppState, Debt, PaymentType, Transaction } from "@/types/finance";
+import type { CashflowAppState, Debt, DebtMonthlyPlan, PaymentType, Transaction } from "@/types/finance";
 
 type Tab =
   | "dashboard"
@@ -76,8 +76,30 @@ export function App() {
   }, []);
 
   const deleteDebt = useCallback((id: string) => {
-    setState((s) => ({ ...s, debts: s.debts.filter((d) => d.id !== id) }));
+    setState((s) => ({
+      ...s,
+      debts: s.debts.filter((d) => d.id !== id),
+      debtMonthlyPlans: (s.debtMonthlyPlans ?? []).filter((p) => p.debtId !== id),
+    }));
   }, []);
+
+  const setDebtMonthPlan = useCallback(
+    (debtId: string, month: string, plan: DebtMonthlyPlan | null) => {
+      setState((s) => {
+        const list = [...(s.debtMonthlyPlans ?? [])];
+        const i = list.findIndex((p) => p.debtId === debtId && p.month === month);
+        if (plan === null) {
+          if (i === -1) return s;
+          list.splice(i, 1);
+          return { ...s, debtMonthlyPlans: list };
+        }
+        if (i === -1) list.push(plan);
+        else list[i] = plan;
+        return { ...s, debtMonthlyPlans: list };
+      });
+    },
+    [],
+  );
 
   return (
     <div className="app-shell">
@@ -151,7 +173,12 @@ export function App() {
           <TypeManager state={state} onUpsertType={upsertType} onDeleteType={deleteType} />
         )}
         {tab === "debts" && (
-          <DebtBoard state={state} onUpsertDebt={upsertDebt} onDeleteDebt={deleteDebt} />
+          <DebtBoard
+            state={state}
+            onUpsertDebt={upsertDebt}
+            onDeleteDebt={deleteDebt}
+            onDebtMonthPlan={setDebtMonthPlan}
+          />
         )}
         {tab === "timeline" && <CashflowTimeline state={state} />}
         {tab === "simulation" && <SimulationPanel state={state} />}

@@ -5,6 +5,7 @@ import {
   summarizeCashflow,
 } from "@/services/cashflowEngine";
 import type { CashflowAppState } from "@/types/finance";
+import { yearMonthLocal } from "@/utils/dateUtils";
 
 type Props = {
   state: CashflowAppState;
@@ -23,7 +24,11 @@ export function Dashboard({
 }: Props) {
   const summary = summarizeCashflow(state);
   const warnings = evaluateRiskWarnings(state);
-  const debtAlloc = allocateDebts(state, summary.totalIncomeThisMonth);
+  const debtAlloc = allocateDebts(
+    state,
+    summary.totalIncomeThisMonth,
+    yearMonthLocal(),
+  );
 
   return (
     <section className="panel">

@@ -1,6 +1,7 @@
 import type {
   CashflowAppState,
   Debt,
+  DebtMonthlyPlan,
   DebtStatus,
   DueFlexibility,
   PaymentPlanItem,
@@ -89,9 +90,16 @@ function migrateRawToLatest(raw: Record<string, unknown>): Record<string, unknow
 
   while (v < SCHEMA_VERSION) {
     if (v === 1) {
-      // v1 → v2: rovnaký tvar domény; miesto na budúce mapovanie polí.
       acc = { ...acc, schemaVersion: 2 };
       v = 2;
+      continue;
+    }
+    if (v === 2) {
+      acc = { ...acc, schemaVersion: 3 };
+      if (!Array.isArray(acc.debtMonthlyPlans)) {
+        acc.debtMonthlyPlans = [];
+      }
+      v = 3;
       continue;
     }
     return null;
@@ -99,6 +107,24 @@ function migrateRawToLatest(raw: Record<string, unknown>): Record<string, unknow
 
   acc.schemaVersion = SCHEMA_VERSION;
   return acc;
+}
+
+function normalizeDebtMonthlyPlan(row: unknown): DebtMonthlyPlan | null {
+  if (!isRecord(row)) return null;
+  const debtId =
+    typeof row.debtId === "string" && row.debtId.length > 0 ? row.debtId : null;
+  const month =
+    typeof row.month === "string" && /^\d{4}-\d{2}$/.test(row.month)
+      ? row.month
+      : null;
+  if (!debtId || !month) return null;
+  const mode = parseString(row.mode, "");
+  if (mode === "skip") return { debtId, month, mode: "skip" };
+  if (mode === "custom") {
+    const customAmount = Math.max(0, safeFiniteMoney(row.customAmount, 0));
+    return { debtId, month, mode: "custom", customAmount };
+  }
+  return null;
 }
 
 function parseString(v: unknown, fallback: string): string {
@@ -283,6 +309,7 @@ function parseNormalizedState(raw: unknown): CashflowAppState | null {
   const paymentTypes = mapArray(migrated.paymentTypes, normalizePaymentType);
   const debts = mapArray(migrated.debts, normalizeDebt);
   const paymentPlanItems = mapArray(migrated.paymentPlanItems, normalizePaymentPlanItem);
+  const debtMonthlyPlans = mapArray(migrated.debtMonthlyPlans, normalizeDebtMonthlyPlan);
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -294,6 +321,7 @@ function parseNormalizedState(raw: unknown): CashflowAppState | null {
     paymentTypes,
     debts,
     paymentPlanItems,
+    debtMonthlyPlans,
   };
 }
 

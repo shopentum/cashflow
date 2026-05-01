@@ -1,4 +1,5 @@
 import type { CashflowAppState, Debt } from "@/types/finance";
+import { yearMonthLocal } from "@/utils/dateUtils";
 import { roundMoney } from "@/utils/moneyUtils";
 
 export interface DebtAllocationLine {
@@ -16,7 +17,8 @@ export interface DebtAllocationResult {
   totalAllocated: number;
 }
 
-function debtTargetAmount(d: Debt, incomeThisMonth: number): number {
+/** Základná preferovaná splátka zo záznamu dlhu (% alebo nominál). */
+export function basePreferredInstallment(d: Debt, incomeThisMonth: number): number {
   if (d.preferredMonthlyAmount > 0) {
     return roundMoney(d.preferredMonthlyAmount);
   }
@@ -27,13 +29,39 @@ function debtTargetAmount(d: Debt, incomeThisMonth: number): number {
 }
 
 /**
- * Rozpočet splátok: strop `incomeThisMonth * debtBudgetPercent / 100`,
- * rozdelenie podľa priority (1 = najvyššia), postupné „čerpanie“ stropu.
- * Manuálne override v stave zatiaľ nie sú — pole `manualOverride` ostáva null.
+ * Cieľová suma zo stropu rozpočtu na dlhy pre jeden záväzok v danom YYYY-MM.
+ * Pevné (`fixed`) záväzky ignorujú `debtMonthlyPlans`. Flexibilné berú mesačný plán používateľa.
+ */
+export function debtPlannedAmountForMonth(
+  state: CashflowAppState,
+  d: Debt,
+  incomeThisMonth: number,
+  calendarMonthKey: string,
+): number {
+  if (d.dueFlexibility === "fixed") {
+    return basePreferredInstallment(d, incomeThisMonth);
+  }
+  const plans = state.debtMonthlyPlans ?? [];
+  const row = plans.find(
+    (p) => p.debtId === d.id && p.month === calendarMonthKey,
+  );
+  if (!row) {
+    return basePreferredInstallment(d, incomeThisMonth);
+  }
+  if (row.mode === "skip") {
+    return 0;
+  }
+  return roundMoney(Math.max(0, row.customAmount ?? 0));
+}
+
+/**
+ * Rozpočet splátok podľa priority (1 = najvyššia), strop ako % mesačného príjmu.
+ * `manualOverride` v riadku zatiaľ nie je v dátach — pole ostáva null.
  */
 export function allocateDebts(
   state: CashflowAppState,
   incomeThisMonth: number,
+  calendarMonthKey: string = yearMonthLocal(),
 ): DebtAllocationResult {
   const cap = roundMoney((incomeThisMonth * state.debtBudgetPercent) / 100);
   const active = state.debts.filter((d: Debt) => d.status === "active");
@@ -41,7 +69,12 @@ export function allocateDebts(
 
   let remainingCap = cap;
   const lines: DebtAllocationLine[] = sorted.map((d) => {
-    const target = debtTargetAmount(d, incomeThisMonth);
+    const target = debtPlannedAmountForMonth(
+      state,
+      d,
+      incomeThisMonth,
+      calendarMonthKey,
+    );
     const applied = roundMoney(Math.min(target, Math.max(0, remainingCap)));
     remainingCap = roundMoney(remainingCap - applied);
     return {

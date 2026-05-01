@@ -64,3 +64,8 @@ export function isDateInInclusiveRange(
 ): boolean {
   return date >= start && date <= end;
 }
+
+/** YYYY-MM pre aktuálny (alebo zadaný) lokálny kalendárny mesiac. */
+export function yearMonthLocal(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}

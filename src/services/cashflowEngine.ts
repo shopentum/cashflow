@@ -138,6 +138,7 @@ function rollupRangeParts(
   debtLedger = roundMoney(debtLedger);
 
   const anchorBounds = calendarMonthBoundsLocal(anchor);
+  const monthKey = anchorBounds.start.slice(0, 7);
   const incomeAnchorMonth = incomeInRange(
     state,
     anchorBounds.start,
@@ -147,7 +148,7 @@ function rollupRangeParts(
   let plannedDebt =
     debtLedger > 0
       ? debtLedger
-      : allocateDebts(state, incomeAnchorMonth).totalAllocated;
+      : allocateDebts(state, incomeAnchorMonth, monthKey).totalAllocated;
 
   if (
     debtLedger === 0 &&

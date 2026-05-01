@@ -1,6 +1,7 @@
 import type { CashflowAppState } from "@/types/finance";
 
-export const SCHEMA_VERSION = 1;
+/** Zvýš pri zmene tvaru ukladaného stavu; migrácia v `storageService`. */
+export const SCHEMA_VERSION = 2;
 
 export function createDefaultState(): CashflowAppState {
   const now = new Date().toISOString();

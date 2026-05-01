@@ -9,6 +9,7 @@ type Props = {
   onUpsertDebt: (d: Debt) => void;
   onDeleteDebt: (id: string) => void;
   onDebtMonthPlan: (debtId: string, month: string, plan: DebtMonthlyPlan | null) => void;
+  onDebtDueFlexibilityChange: (debtId: string, dueFlexibility: Debt["dueFlexibility"]) => void;
 };
 
 let did = 0;
@@ -22,6 +23,7 @@ export function DebtBoard({
   onUpsertDebt,
   onDeleteDebt,
   onDebtMonthPlan,
+  onDebtDueFlexibilityChange,
 }: Props) {
   const currentMonth = yearMonthLocal();
 
@@ -97,6 +99,23 @@ export function DebtBoard({
                 <span>Zostáva: {formatMoneyEUR(d.remainingAmount)}</span>
                 <span>Základ mes.: {formatMoneyEUR(d.preferredMonthlyAmount)}</span>
               </div>
+
+              <label className="field debt-flex-edit">
+                <span>Úprava záväzku</span>
+                <select
+                  aria-label={`Typ splátky: ${d.name}`}
+                  value={d.dueFlexibility}
+                  onChange={(e) =>
+                    onDebtDueFlexibilityChange(
+                      d.id,
+                      e.target.value as Debt["dueFlexibility"],
+                    )
+                  }
+                >
+                  <option value="fixed">Pevná splátka</option>
+                  <option value="flexible">Flexibilná (mesačne zmeniteľná)</option>
+                </select>
+              </label>
 
               {d.dueFlexibility === "flexible" && (
                 <FlexibleMonthPlanControls

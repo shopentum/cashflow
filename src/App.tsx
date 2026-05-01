@@ -101,6 +101,23 @@ export function App() {
     [],
   );
 
+  const setDebtDueFlexibility = useCallback(
+    (debtId: string, dueFlexibility: Debt["dueFlexibility"]) => {
+      const updatedAt = new Date().toISOString();
+      setState((s) => ({
+        ...s,
+        debts: s.debts.map((d) =>
+          d.id === debtId ? { ...d, dueFlexibility, updatedAt } : d,
+        ),
+        debtMonthlyPlans:
+          dueFlexibility === "fixed"
+            ? (s.debtMonthlyPlans ?? []).filter((p) => p.debtId !== debtId)
+            : (s.debtMonthlyPlans ?? []),
+      }));
+    },
+    [],
+  );
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -178,6 +195,7 @@ export function App() {
             onUpsertDebt={upsertDebt}
             onDeleteDebt={deleteDebt}
             onDebtMonthPlan={setDebtMonthPlan}
+            onDebtDueFlexibilityChange={setDebtDueFlexibility}
           />
         )}
         {tab === "timeline" && <CashflowTimeline state={state} />}

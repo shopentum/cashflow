@@ -302,6 +302,14 @@ body {
   color: var(--muted);
 }
 
+.debt-flex-edit {
+  margin: 0.65rem 0 0.35rem;
+}
+
+.debt-flex-edit select {
+  max-width: min(100%, 22rem);
+}
+
 .debt-actions {
   margin-top: 0.65rem;
 }

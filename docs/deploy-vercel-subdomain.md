@@ -18,6 +18,15 @@ Tento návod predpokladá doménu **aifreelancer.sk** u Websupport a hlavný pro
 
 3. Over, že v repozitári sú aspoň: `package.json`, `vite.config.ts`, `src/`, `vercel.json`.
 
+### Ak vo Verceli „nie je žiadny deploy“ / projekt vôbec nepribudol
+
+Úplný začiatok musíš urobiť **ručne na vercel.com** — push na GitHub sám deploy nespustí, kým neexistuje napojenie.
+
+1. **GitHub aplikácia Vercelu:** účet (alebo organizácia `shopentum`) na GitHu musí mať [Vercel GitHub Integration](https://vercel.com/docs/deployments/git/vercel-for-github); pri **Import** potvrď oprávnenia na výber repozitára `cashflow`.
+2. **Add New → Project → Import** `shopentum/cashflow`, vetva **`main`**, Root Directory prázdny (monorepo off).
+3. Build musí zostať ako v `vercel.json`: Framework **Vite**, `npm run build`, Output **`dist`**.
+4. Po prvom úspechu uvidíš v záložke **Deployments** aspoň jeden záznam; pri chybe otvor log buildu (**Building** → červený riadok).
+
 ## 2. Nový projekt na Verceli
 
 1. Prihlás sa na [vercel.com](https://vercel.com), **Add New → Project**.

@@ -1,12 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
+import {
+  CalendarDays,
+  CreditCard,
+  LayoutDashboard,
+  LineChart,
+  PlusCircle,
+  Tags,
+  WalletCards,
+} from "lucide-react";
 import { CashflowTimeline } from "@/components/CashflowTimeline";
 import { Dashboard } from "@/components/Dashboard";
 import { DebtBoard } from "@/components/DebtBoard";
 import { SimulationPanel } from "@/components/SimulationPanel";
-import { TransactionForm } from "@/components/TransactionForm";
+import { TransactionFormModal } from "@/components/TransactionForm";
 import { TypeManager } from "@/components/TypeManager";
 import { loadState, saveState } from "@/services/storageService";
-import type { CashflowAppState, Debt, DebtMonthlyPlan, PaymentType, Transaction } from "@/types/finance";
+import { cn } from "@/lib/utils";
+import type {
+  CashflowAppState,
+  Debt,
+  DebtMonthlyPlan,
+  PaymentType,
+  Transaction,
+} from "@/types/finance";
 
 type Tab =
   | "dashboard"
@@ -16,14 +32,57 @@ type Tab =
   | "timeline"
   | "simulation";
 
+type NavEntry = {
+  id: Tab;
+  label: string;
+  Icon: typeof LayoutDashboard;
+};
+
+const NAV_ENTRIES: NavEntry[] = [
+  { id: "dashboard", label: "Prehľad", Icon: LayoutDashboard },
+  { id: "transaction", label: "Transakcie", Icon: CreditCard },
+  { id: "types", label: "Typy", Icon: Tags },
+  { id: "debts", label: "Dlh", Icon: WalletCards },
+  { id: "timeline", label: "Časová os", Icon: CalendarDays },
+  { id: "simulation", label: "Simulácia", Icon: LineChart },
+];
+
 let txSeq = 0;
 function newTxId(): string {
   txSeq += 1;
   return `tx-${Date.now()}-${txSeq}`;
 }
 
+function NavButtons({
+  tab,
+  onTab,
+}: {
+  tab: Tab;
+  onTab: (id: Tab) => void;
+}) {
+  return (
+    <>
+      {NAV_ENTRIES.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onTab(id)}
+          className={cn(
+            "omega-nav-item shrink-0",
+            tab === id && "omega-nav-active font-semibold text-white",
+          )}
+        >
+          <Icon className="h-5 w-5 shrink-0 opacity-80" aria-hidden />
+          {label}
+        </button>
+      ))}
+    </>
+  );
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [transactionModalOpen, setTransactionModalOpen] = useState(false);
   const [state, setState] = useState<CashflowAppState>(() => loadState());
 
   useEffect(() => {
@@ -118,89 +177,152 @@ export function App() {
     [],
   );
 
-  return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div>
-          <h1>OMEGA Cashflow</h1>
-          <p className="tagline">Osobný cashflow — rozhodovanie zostáva na tebe</p>
-        </div>
-        <nav className="tabs" aria-label="Hlavná navigácia">
-          {(
-            [
-              ["dashboard", "Prehľad"],
-              ["transaction", "Transakcia"],
-              ["types", "Typy"],
-              ["debts", "Dlh"],
-              ["timeline", "Časová os"],
-              ["simulation", "Simulácia"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={tab === id ? "tab active" : "tab"}
-              onClick={() => setTab(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
+  useEffect(() => {
+    setTransactionModalOpen(false);
+  }, [tab]);
 
-      <main className="app-main">
-        {tab === "dashboard" && (
-          <Dashboard
-            state={state}
-            onChangeBalance={(v) => setState((s) => ({ ...s, currentBalance: v }))}
-            onChangeBuffer={(v) => setState((s) => ({ ...s, safetyBuffer: v }))}
-            onChangeDebtPercent={(v) =>
-              setState((s) => ({ ...s, debtBudgetPercent: Math.min(100, Math.max(0, v)) }))
-            }
-            onToggleEmergencyFreeze={() =>
-              setState((s) => ({ ...s, emergencyFreeze: !s.emergencyFreeze }))
-            }
-          />
-        )}
-        {tab === "transaction" && (
-          <>
-            <TransactionForm state={state} onAdd={addTransaction} />
-            <section className="panel">
-              <h2>Posledné transakcie</h2>
-              {state.transactions.length === 0 ? (
-                <p className="muted">Zatiaľ žiadne záznamy.</p>
-              ) : (
-                <ul className="tx-list">
-                  {state.transactions.slice(0, 20).map((t) => (
-                    <li key={t.id}>
-                      <span className={t.direction === "income" ? "pos" : "neg"}>
-                        {t.direction === "income" ? "+" : "−"}
-                        {t.title}
-                      </span>
-                      <span className="money">{t.amount} €</span>
-                      <span className="muted">{t.date}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </>
-        )}
-        {tab === "types" && (
-          <TypeManager state={state} onUpsertType={upsertType} onDeleteType={deleteType} />
-        )}
-        {tab === "debts" && (
-          <DebtBoard
-            state={state}
-            onUpsertDebt={upsertDebt}
-            onDeleteDebt={deleteDebt}
-            onDebtMonthPlan={setDebtMonthPlan}
-            onDebtDueFlexibilityChange={setDebtDueFlexibility}
-          />
-        )}
-        {tab === "timeline" && <CashflowTimeline state={state} />}
-        {tab === "simulation" && <SimulationPanel state={state} />}
-      </main>
+  return (
+    <div className="flex min-h-screen flex-col md:flex-row">
+      <aside
+        aria-label="Primárna navigácia"
+        className="hidden shrink-0 border-r border-white/10 bg-slate-950/95 backdrop-blur-sm md:flex md:w-56 md:flex-col lg:w-64"
+      >
+        <div className="border-b border-white/10 px-6 py-8">
+          <p className="omega-eyebrow mb-0">Omega</p>
+          <h1 className="mt-2 text-xl font-black uppercase italic tracking-tighter text-white">
+            Cashflow
+          </h1>
+          <p className="mt-2 max-w-[12rem] text-xs leading-relaxed text-slate-500">
+            Rozhodovanie zostáva na tebe — motor len ráta dopady.
+          </p>
+        </div>
+        <nav className="scrollbar-omega flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
+          <NavButtons tab={tab} onTab={setTab} />
+        </nav>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/90 backdrop-blur-md md:hidden">
+          <header className="flex items-start justify-between gap-3 px-4 py-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.35em] text-indigo-400">
+                Omega
+              </p>
+              <span className="text-lg font-black uppercase italic text-white">
+                Cashflow
+              </span>
+            </div>
+          </header>
+          <nav
+            className="scrollbar-omega flex gap-1 overflow-x-auto px-2 pb-3"
+            aria-label="Hlavná navigácia"
+          >
+            <NavButtons tab={tab} onTab={setTab} />
+          </nav>
+        </div>
+
+        <main className="scrollbar-omega flex-1 p-4 pb-10 md:p-8">
+          <div className="mx-auto max-w-4xl xl:max-w-5xl">
+            {tab === "dashboard" && (
+              <Dashboard
+                state={state}
+                onChangeBalance={(v) => setState((s) => ({ ...s, currentBalance: v }))}
+                onChangeBuffer={(v) => setState((s) => ({ ...s, safetyBuffer: v }))}
+                onChangeDebtPercent={(v) =>
+                  setState((s) => ({
+                    ...s,
+                    debtBudgetPercent: Math.min(100, Math.max(0, v)),
+                  }))
+                }
+                onToggleEmergencyFreeze={() =>
+                  setState((s) => ({ ...s, emergencyFreeze: !s.emergencyFreeze }))
+                }
+              />
+            )}
+            {tab === "transaction" && (
+              <>
+                <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="omega-h2 mb-2">Transakcie</h2>
+                    <p className="text-sm text-slate-400">
+                      Zobrazenie pohybov podľa lokálneho stavu aplikácie.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTransactionModalOpen(true)}
+                    className="omega-btn-primary inline-flex items-center justify-center gap-2 self-start sm:self-center"
+                  >
+                    <PlusCircle className="h-4 w-4" aria-hidden />
+                    Pridať pohyb
+                  </button>
+                </div>
+
+                <section className="omega-panel">
+                  <h2 className="mb-6 text-lg font-semibold text-white">
+                    Posledné transakcie
+                  </h2>
+                  {state.transactions.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      Zatiaľ žiadne záznamy — použitím „Pridať pohyb“ vytvor prvú položku.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-white/10 rounded-2xl border border-white/5 bg-black/15">
+                      {state.transactions.slice(0, 20).map((t) => (
+                        <li
+                          key={t.id}
+                          className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 text-sm md:px-5"
+                        >
+                          <span
+                            className={cn(
+                              "min-w-0 flex-1 font-semibold",
+                              t.direction === "income"
+                                ? "text-emerald-400"
+                                : "text-red-400",
+                            )}
+                          >
+                            <span aria-hidden>{t.direction === "income" ? "+" : "−"}</span>
+                            {t.title}
+                          </span>
+                          <span className="tabular-nums font-medium text-white">
+                            {t.amount} €
+                          </span>
+                          <span className="text-xs text-slate-500">{t.date}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </>
+            )}
+            {tab === "types" && (
+              <TypeManager
+                state={state}
+                onUpsertType={upsertType}
+                onDeleteType={deleteType}
+              />
+            )}
+            {tab === "debts" && (
+              <DebtBoard
+                state={state}
+                onUpsertDebt={upsertDebt}
+                onDeleteDebt={deleteDebt}
+                onDebtMonthPlan={setDebtMonthPlan}
+                onDebtDueFlexibilityChange={setDebtDueFlexibility}
+              />
+            )}
+            {tab === "timeline" && <CashflowTimeline state={state} />}
+            {tab === "simulation" && <SimulationPanel state={state} />}
+          </div>
+        </main>
+      </div>
+
+      <TransactionFormModal
+        open={transactionModalOpen}
+        onClose={() => setTransactionModalOpen(false)}
+        state={state}
+        onAdd={addTransaction}
+      />
     </div>
   );
 }

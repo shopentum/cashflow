@@ -1,6 +1,10 @@
 OMEGA PROTOCOL - PERSONAL CASHFLOW DECISION SYSTEM
 
+<!-- LAS metadata: táto markdown verzia má rovnako platiť ako Confluence „Omega Cashflow — LAS · MVP“. Konflikt: vyhráva zlúčený súbor na `main` v repozitári omega-cashflow. -->
+
 Build a simple personal cashflow planning app.
+
+**LAS (*Leading Architectural Specification*)** je jednotný riadiaci zdroj domény MVP: tento súbor v repozitári **`docs/mvp_cashflow_spec.md`** má rovnako značenie na Confluence a popisuje funkcionalitu bez implementačných detailov kódu. Git remote: https://github.com/shopentum/cashflow — produkcia (Vercel): https://cashflow.aifreelancer.sk
 
 CORE PURPOSE
 This is not an accounting app.
@@ -36,6 +40,7 @@ Fields:
 * date
 * status: planned | done | skipped | moved
 * note
+* fulfillsRecurringMovementId nullable — transakcia v danom kalendárnom mesiaci dopĺňa projekciu mesačnej šablóny (recurring), aby ju motor nerátal dvakrát
 * createdAt
 * updatedAt
 2. PaymentType
@@ -95,6 +100,24 @@ Fields:
 * actualAmountOverride optional
 * status: planned | paid | skipped | moved
 * note
+
+4b. RecurringMovement *(mesačná šablóna — príjem aj výdavok)*
+
+Namiesto samostatného „plánu príjmu“ používa aplikácia jeden typ **RecurringMovement** pre oba smery.
+
+Fields:
+
+* id
+* direction: income | expense
+* title
+* amount
+* typeId
+* dayOfMonth (1–31; neexistujúci deň v mesiaci sa bezpečne zúži na posledný deň mesiaca)
+* active
+* note
+* createdAt
+
+**Formulár nového pohybu — Opakovanie:** *Jednorazovo* (voliteľné prepojenie na existujúcu šablónu zhodného smeru) alebo *Mesačne* (úloženie novej šablóny podľa vybraného dátumu a transakcie s jej prepojením).
 
 IMPORTANT OVERRIDE LOGIC
 If a planned payment is 250 EUR monthly, the user must be able to:
@@ -178,25 +201,32 @@ UI STRUCTURE
 1. Dashboard
 Show:
 * current balance
-* income this month
-* fixed payments this month
-* debt payments planned
-* available cash
-* safety buffer
-* remaining after plan
-* next important payment
+* safety buffer, debt budget %, emergency freeze
+* **horný blok „Mesačný prehľad“** pre vybraný kalendárny mesiac: **Príjmy**, **Výdavky**, **Zostatok pohybov** (čiastkový výsledok = príjmy − výdavky v pomere zarátania), vrátane reálnych transakcií a doplnenia plánu z nesplnených opakovaní v mesiaci; zdieľaný výber **`YYYY-MM`** s kartou Transakcie
+* detail motora za ten istý mesiac (rozpad fixné/flex/dlhy vrátane alokácie dlhov)
+* available / safe-to-use cash, remaining-after-plan metrics z motora rizík
+* *(vol.) budúci doplnok: „ďalší dôležitý platobný okamih“.*
+
+**Vyber kalendára:** používateľský **`calendarMonthYM`** je zdieľaný medzi Dashboardom (mesačný prehľad + detail motora) a kartou Transakcie (filtrovaný zoznam v danom **`YYYY-MM`**).
+
 2. Add Transaction
 Fast form:
 * title
 * amount
 * income or expense
 * type
-* date
+* **Opakovanie: Jednorazovo \| Mesačne** (mesačne ⇒ nová šablóna RecurringMovement + prepojenie)
+* date *(pri mesiaci určuje deň v šablóne)*
 * status
 * note
 3. Types Manager
 User can create, edit, delete payment types.
-4. Debt Board
+
+4. Recurring (**RecurringMovementPanel**)
+
+CRUD šablón opakovaných pohybov (**RecurringMovement**) pre **príjem aj výdavok**; používané projekčne v motore aj pri prepojení z formulára pohybu.
+
+5. Debt Board
 Show debts:
 * name
 * remaining amount
@@ -213,13 +243,13 @@ Actions:
 * skip this month
 * move payment
 * mark as paid
-5. Timeline / Calendar View
+6. Timeline / Calendar View
 Show upcoming cashflow by date:
 * incoming payments
 * outgoing payments
 * debt payments
 * remaining balance after each event
-6. Simulation Mode
+7. Simulation Mode
 User can test:
 * What if I pay 500 EUR instead of 250?
 * What if I move this payment by 10 days?
@@ -244,6 +274,7 @@ Recommended structure:
 src/
 components/
 Dashboard.tsx
+RecurringMovementPanel.tsx
 TransactionForm.tsx
 TypeManager.tsx
 DebtBoard.tsx
@@ -254,10 +285,12 @@ storageService.ts
 cashflowEngine.ts
 debtAllocationEngine.ts
 types/
-finance.ts
+finance.ts *(schémy `recurringMovements`, pole `Transaction.fulfillsRecurringMovementId`; migrácia z legacy `recurringIncomes`)*
 utils/
 dateUtils.ts
 moneyUtils.ts
+
+**Transakcie (zoznam v UI):** zobrazujú sa **iba** pohyby, ktorých `date` leží v kalendárnych hraniciach práve vybraného **`calendarMonthYM`**, chronologicky od najstaršieho (`date`, potom `createdAt`). Žiadny globálny „náhodný výrez“ prvých N transakcie.
 
 DATA SAFETY
 This is personal finance data.

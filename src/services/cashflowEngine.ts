@@ -102,34 +102,79 @@ function uniqYearMonthsIntersectingRange(
   return out;
 }
 
-/** Prírastok mesačne opakovaného príjmu: ak výplatný deň padne do výpočtu a v danom kalendárnom mesiaci chýba transakcia s `fulfillsRecurringIncomeId`. */
-function projectedRecurringIncomeInRange(
+function projectedRecurringBuckets(
   state: CashflowAppState,
   rangeStart: string,
   rangeEnd: string,
-): number {
-  const list = state.recurringIncomes ?? [];
-  if (list.length === 0 || rangeStart > rangeEnd) return 0;
-  let plus = 0;
+  emergencyFreeze: boolean,
+): { income: number; fixed: number; flex: number; debtLedger: number } {
+  const list = state.recurringMovements ?? [];
+  const out = { income: 0, fixed: 0, flex: 0, debtLedger: 0 };
+  if (list.length === 0 || rangeStart > rangeEnd) return out;
+
+  function addExpenseAmount(typeId: string, amount: number): void {
+    const k = kindOfType(state, typeId);
+    if (k === "debt") {
+      out.debtLedger += amount;
+      return;
+    }
+    if (k === "fixed_expense") {
+      out.fixed += amount;
+      return;
+    }
+    if (FLEX_KINDS.has(k)) {
+      if (
+        emergencyFreeze &&
+        (k === "flexible_expense" || k === "savings")
+      ) {
+        return;
+      }
+      out.flex += amount;
+      return;
+    }
+    out.flex += amount;
+  }
+
   for (const ym of uniqYearMonthsIntersectingRange(rangeStart, rangeEnd)) {
     const monthFirst = `${ym}-01`;
-    for (const ri of list) {
-      if (!ri.active || ri.amount <= 0) continue;
-      const pt = state.paymentTypes.find((p) => p.id === ri.typeId);
-      if (!pt || pt.kind !== "income") continue;
-      const occISO = dayInCalendarMonth(monthFirst, ri.dayOfMonth);
+    for (const rm of list) {
+      if (!rm.active || rm.amount <= 0) continue;
+      const occISO = dayInCalendarMonth(monthFirst, rm.dayOfMonth);
       if (!isDateInInclusiveRange(occISO, rangeStart, rangeEnd)) continue;
-      const fulfilled = state.transactions.some(
+      const pt = state.paymentTypes.find((p) => p.id === rm.typeId);
+      if (!pt) continue;
+
+      if (rm.direction === "income") {
+        if (pt.kind !== "income") continue;
+        const fulfilled = state.transactions.some(
+          (t) =>
+            t.direction === "income" &&
+            isCountedForCashflow(t) &&
+            t.fulfillsRecurringMovementId === rm.id &&
+            t.date.startsWith(`${ym}-`),
+        );
+        if (!fulfilled) out.income += rm.amount;
+        continue;
+      }
+
+      /* expense recurrence */
+      if (pt.kind === "income") continue;
+      const fulfilledEx = state.transactions.some(
         (t) =>
-          t.direction === "income" &&
+          t.direction === "expense" &&
           isCountedForCashflow(t) &&
-          t.fulfillsRecurringIncomeId === ri.id &&
+          t.fulfillsRecurringMovementId === rm.id &&
           t.date.startsWith(`${ym}-`),
       );
-      if (!fulfilled) plus += ri.amount;
+      if (!fulfilledEx) addExpenseAmount(rm.typeId, rm.amount);
     }
   }
-  return roundMoney(plus);
+
+  out.income = roundMoney(out.income);
+  out.fixed = roundMoney(out.fixed);
+  out.flex = roundMoney(out.flex);
+  out.debtLedger = roundMoney(out.debtLedger);
+  return out;
 }
 
 function rollupRangeParts(
@@ -185,16 +230,23 @@ function rollupRangeParts(
     flex += t.amount;
   }
 
-  income = roundMoney(income + projectedRecurringIncomeInRange(state, start, end));
-  fixed = roundMoney(fixed);
-  flex = roundMoney(flex);
-  debtLedger = roundMoney(debtLedger);
+  const proj = projectedRecurringBuckets(state, start, end, emergencyFreeze);
+  income = roundMoney(income + proj.income);
+  fixed = roundMoney(fixed + proj.fixed);
+  flex = roundMoney(flex + proj.flex);
+  debtLedger = roundMoney(debtLedger + proj.debtLedger);
 
   const anchorBounds = calendarMonthBoundsLocal(anchor);
   const monthKey = anchorBounds.start.slice(0, 7);
+  const anchorProj = projectedRecurringBuckets(
+    state,
+    anchorBounds.start,
+    anchorBounds.end,
+    emergencyFreeze,
+  );
   const incomeAnchorMonth = roundMoney(
     incomeInRange(state, anchorBounds.start, anchorBounds.end) +
-      projectedRecurringIncomeInRange(state, anchorBounds.start, anchorBounds.end),
+      anchorProj.income,
   );
 
   let plannedDebt =

@@ -13,8 +13,8 @@ import { CashflowTimeline } from "@/components/CashflowTimeline";
 import { Dashboard } from "@/components/Dashboard";
 import { DebtBoard } from "@/components/DebtBoard";
 import { SimulationPanel } from "@/components/SimulationPanel";
-import { RecurringIncomePanel } from "@/components/RecurringIncomePanel";
-import { TransactionFormModal } from "@/components/TransactionForm";
+import { RecurringMovementPanel } from "@/components/RecurringMovementPanel";
+import { TransactionFormModal, type RepeatMode } from "@/components/TransactionForm";
 import { TypeManager } from "@/components/TypeManager";
 import { loadState, saveState } from "@/services/storageService";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,7 @@ import type {
   Debt,
   DebtMonthlyPlan,
   PaymentType,
-  RecurringIncome,
+  RecurringMovement,
   Transaction,
 } from "@/types/finance";
 
@@ -46,7 +46,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { id: "dashboard", label: "Prehľad", Icon: LayoutDashboard },
   { id: "transaction", label: "Transakcie", Icon: CreditCard },
   { id: "types", label: "Typy", Icon: Tags },
-  { id: "recurring", label: "Príjmy (plán)", Icon: Repeat2 },
+  { id: "recurring", label: "Opakované", Icon: Repeat2 },
   { id: "debts", label: "Dlh", Icon: WalletCards },
   { id: "timeline", label: "Časová os", Icon: CalendarDays },
   { id: "simulation", label: "Simulácia", Icon: LineChart },
@@ -56,6 +56,18 @@ let txSeq = 0;
 function newTxId(): string {
   txSeq += 1;
   return `tx-${Date.now()}-${txSeq}`;
+}
+
+let recvSeq = 0;
+function newRecurringMovementId(): string {
+  recvSeq += 1;
+  return `recv-${Date.now()}-${recvSeq}`;
+}
+
+function calendarDayFromIso(dateIso: string): number {
+  const d = Number.parseInt(dateIso.slice(8, 10), 10);
+  if (!Number.isFinite(d) || d < 1) return 1;
+  return Math.min(31, d);
 }
 
 function NavButtons({
@@ -94,17 +106,46 @@ export function App() {
     saveState(state);
   }, [state]);
 
-  const addTransaction = useCallback(
-    (partial: Omit<Transaction, "id" | "createdAt" | "updatedAt">) => {
+  const commitTransaction = useCallback(
+    (
+      recurrence: RepeatMode,
+      partial: Omit<Transaction, "id" | "createdAt" | "updatedAt">,
+    ) => {
       const now = new Date().toISOString();
-      const row: Transaction = {
-        ...partial,
-        fulfillsRecurringIncomeId: partial.fulfillsRecurringIncomeId ?? null,
-        id: newTxId(),
-        createdAt: now,
-        updatedAt: now,
-      };
-      setState((s) => ({ ...s, transactions: [row, ...s.transactions] }));
+      setState((s) => {
+        const movements = [...(s.recurringMovements ?? [])];
+        let fulfillsId: string | null =
+          partial.fulfillsRecurringMovementId ?? null;
+
+        if (recurrence === "monthly") {
+          const tmpl: RecurringMovement = {
+            id: newRecurringMovementId(),
+            direction: partial.direction,
+            title: partial.title.trim() || "Bez názvu",
+            amount: partial.amount,
+            typeId: partial.typeId,
+            dayOfMonth: calendarDayFromIso(partial.date),
+            active: true,
+            note: partial.note.trim(),
+            createdAt: now,
+          };
+          movements.push(tmpl);
+          fulfillsId = tmpl.id;
+        }
+
+        const row: Transaction = {
+          ...partial,
+          fulfillsRecurringMovementId: fulfillsId,
+          id: newTxId(),
+          createdAt: now,
+          updatedAt: now,
+        };
+        return {
+          ...s,
+          recurringMovements: movements,
+          transactions: [row, ...s.transactions],
+        };
+      });
     },
     [],
   );
@@ -128,23 +169,23 @@ export function App() {
     }));
   }, []);
 
-  const upsertRecurringIncome = useCallback((row: RecurringIncome) => {
+  const upsertRecurringMovement = useCallback((row: RecurringMovement) => {
     setState((s) => {
-      const list = [...(s.recurringIncomes ?? [])];
+      const list = [...(s.recurringMovements ?? [])];
       const idx = list.findIndex((x) => x.id === row.id);
-      if (idx === -1) return { ...s, recurringIncomes: [...list, row] };
+      if (idx === -1) return { ...s, recurringMovements: [...list, row] };
       list[idx] = row;
-      return { ...s, recurringIncomes: list };
+      return { ...s, recurringMovements: list };
     });
   }, []);
 
-  const deleteRecurringIncome = useCallback((id: string) => {
+  const deleteRecurringMovement = useCallback((id: string) => {
     setState((s) => ({
       ...s,
-      recurringIncomes: (s.recurringIncomes ?? []).filter((x) => x.id !== id),
+      recurringMovements: (s.recurringMovements ?? []).filter((x) => x.id !== id),
       transactions: s.transactions.map((t) =>
-        t.fulfillsRecurringIncomeId === id
-          ? { ...t, fulfillsRecurringIncomeId: null }
+        t.fulfillsRecurringMovementId === id
+          ? { ...t, fulfillsRecurringMovementId: null }
           : t,
       ),
     }));
@@ -297,8 +338,8 @@ export function App() {
                   ) : (
                     <ul className="divide-y divide-white/10 rounded-2xl border border-white/5 bg-black/15">
                       {state.transactions.slice(0, 20).map((t) => {
-                        const rp = t.fulfillsRecurringIncomeId
-                          ? state.recurringIncomes?.find((r) => r.id === t.fulfillsRecurringIncomeId)
+                        const rp = t.fulfillsRecurringMovementId
+                          ? state.recurringMovements?.find((r) => r.id === t.fulfillsRecurringMovementId)
                           : undefined;
                         return (
                         <li
@@ -341,10 +382,10 @@ export function App() {
               />
             )}
             {tab === "recurring" && (
-              <RecurringIncomePanel
+              <RecurringMovementPanel
                 state={state}
-                onUpsert={upsertRecurringIncome}
-                onDelete={deleteRecurringIncome}
+                onUpsert={upsertRecurringMovement}
+                onDelete={deleteRecurringMovement}
               />
             )}
             {tab === "debts" && (
@@ -366,7 +407,7 @@ export function App() {
         open={transactionModalOpen}
         onClose={() => setTransactionModalOpen(false)}
         state={state}
-        onAdd={addTransaction}
+        onCommit={commitTransaction}
       />
     </div>
   );

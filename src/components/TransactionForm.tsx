@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Calendar,
   FileText,
+  Repeat,
   Save,
   Tag,
   TrendingDown,
@@ -24,11 +25,16 @@ import type {
 import { cn } from "@/lib/utils";
 import { todayISO } from "@/utils/dateUtils";
 
+export type RepeatMode = "once" | "monthly";
+
 type Props = {
   open: boolean;
   onClose: () => void;
   state: CashflowAppState;
-  onAdd: (t: Omit<Transaction, "id" | "createdAt" | "updatedAt">) => void;
+  onCommit: (
+    recurrence: RepeatMode,
+    transaction: Omit<Transaction, "id" | "createdAt" | "updatedAt">,
+  ) => void;
 };
 
 function paymentTypesForDirection(
@@ -54,7 +60,7 @@ export function TransactionFormModal({
   open,
   onClose,
   state,
-  onAdd,
+  onCommit,
 }: Props) {
   const [direction, setDirection] = useState<"income" | "expense">("expense");
   const [title, setTitle] = useState("");
@@ -63,16 +69,20 @@ export function TransactionFormModal({
   const [date, setDate] = useState(todayISO());
   const [status, setStatus] = useState<TransactionStatus>("planned");
   const [note, setNote] = useState("");
-  const [fulfillsRecurringIncomeId, setFulfillsRecurringIncomeId] = useState("");
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>("once");
+  const [fulfillsMovementId, setFulfillsMovementId] = useState("");
 
   const filteredTypes = useMemo(
     () => paymentTypesForDirection(state.paymentTypes, direction),
     [state.paymentTypes, direction],
   );
 
-  const recurringPlansActive = useMemo(
-    () => (state.recurringIncomes ?? []).filter((r) => r.active),
-    [state.recurringIncomes],
+  const recurringPlansMatchingDirection = useMemo(
+    () =>
+      (state.recurringMovements ?? []).filter(
+        (r) => r.active && r.direction === direction,
+      ),
+    [state.recurringMovements, direction],
   );
 
   useEffect(() => {
@@ -82,7 +92,8 @@ export function TransactionFormModal({
   }, [filteredTypes, typeId]);
 
   useEffect(() => {
-    setFulfillsRecurringIncomeId("");
+    setRepeatMode("once");
+    setFulfillsMovementId("");
   }, [direction]);
 
   useEffect(() => {
@@ -93,13 +104,22 @@ export function TransactionFormModal({
     setAmount("");
     setStatus("planned");
     setNote("");
-    setFulfillsRecurringIncomeId("");
+    setRepeatMode("once");
+    setFulfillsMovementId("");
   }, [open]);
 
   useEffect(() => {
-    const ids = new Set(recurringPlansActive.map((r) => r.id));
-    setFulfillsRecurringIncomeId((prev) => (prev && ids.has(prev) ? prev : ""));
-  }, [recurringPlansActive]);
+    if (repeatMode === "monthly") {
+      setFulfillsMovementId("");
+    }
+  }, [repeatMode]);
+
+  useEffect(() => {
+    const ids = new Set(recurringPlansMatchingDirection.map((r) => r.id));
+    setFulfillsMovementId((prev) =>
+      prev && ids.has(prev) ? prev : "",
+    );
+  }, [recurringPlansMatchingDirection]);
 
   const handleSubmit = useCallback(
     (e: FormEvent) => {
@@ -108,10 +128,10 @@ export function TransactionFormModal({
       if (!title.trim() || !Number.isFinite(amt) || amt < 0) return;
       const tid = typeId || filteredTypes[0]?.id || state.paymentTypes[0]?.id;
       if (!tid) return;
-      const recurringIdRaw = fulfillsRecurringIncomeId.trim();
-      const fulfillsId =
-        direction === "income" && recurringIdRaw ? recurringIdRaw : null;
-      onAdd({
+      const linkRaw = fulfillsMovementId.trim();
+      const manualFulfills =
+        repeatMode === "once" && linkRaw.length > 0 ? linkRaw : null;
+      onCommit(repeatMode, {
         title: title.trim() || "Bez názvu",
         amount: amt,
         direction,
@@ -119,7 +139,7 @@ export function TransactionFormModal({
         date,
         status,
         note: note.trim(),
-        fulfillsRecurringIncomeId: fulfillsId,
+        fulfillsRecurringMovementId: manualFulfills,
       });
       onClose();
     },
@@ -128,10 +148,11 @@ export function TransactionFormModal({
       date,
       direction,
       filteredTypes,
-      fulfillsRecurringIncomeId,
+      fulfillsMovementId,
       note,
-      onAdd,
       onClose,
+      onCommit,
+      repeatMode,
       state.paymentTypes,
       status,
       title,
@@ -182,10 +203,7 @@ export function TransactionFormModal({
               <div className="flex rounded-2xl border border-white/10 bg-white/5 p-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    setDirection("expense");
-                    setFulfillsRecurringIncomeId("");
-                  }}
+                  onClick={() => setDirection("expense")}
                   className={cn(
                     "flex flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-black uppercase tracking-widest transition-all",
                     direction === "expense"
@@ -198,10 +216,7 @@ export function TransactionFormModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setDirection("income");
-                    setFulfillsRecurringIncomeId("");
-                  }}
+                  onClick={() => setDirection("income")}
                   className={cn(
                     "flex flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-black uppercase tracking-widest transition-all",
                     direction === "income"
@@ -224,8 +239,8 @@ export function TransactionFormModal({
               {direction === "expense" &&
                 state.paymentTypes.every((p) => p.kind === "income") && (
                   <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs font-medium text-amber-200">
-                    Nemáš výdavkovú kategóriu — všetky typy sú príjmové. Pridaj typ výdavku v
-                    sekcii Typy.
+                    Nemáš výdavkovú kategóriu — všetky typy sú príjmové. Pridaj typ výdavku v sekcii
+                    Typy.
                   </p>
                 )}
 
@@ -274,32 +289,57 @@ export function TransactionFormModal({
                 </select>
               </label>
 
-              {direction === "income" && recurringPlansActive.length > 0 && (
-                <label className="block">
-                  <span className="omega-label">Prepojenie s plánom príjmu</span>
-                  <select
-                    className="omega-input cursor-pointer"
-                    value={fulfillsRecurringIncomeId}
-                    onChange={(e) => setFulfillsRecurringIncomeId(e.target.value)}
-                  >
-                    <option value="">Jednorazový / bez plánu</option>
-                    {recurringPlansActive.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.title} ({r.amount.toLocaleString("sk-SK")} €)
-                      </option>
-                    ))}
-                  </select>
+              <label className="block">
+                <span className="omega-label flex items-center gap-2">
+                  <Repeat size={14} className="text-slate-500" aria-hidden />
+                  Opakovanie
+                </span>
+                <select
+                  className="omega-input cursor-pointer"
+                  value={repeatMode}
+                  onChange={(e) => setRepeatMode(e.target.value as RepeatMode)}
+                >
+                  <option value="once">Jednorazovo</option>
+                  <option value="monthly">Mesačne (nova šablóna z tohto pohybu)</option>
+                </select>
+                {repeatMode === "monthly" && (
                   <span className="mt-2 block text-[11px] leading-relaxed text-slate-500">
-                    Vyber položku, aby sa mesačná projekcia tohto plánu nevyrátala dvakrát. Nechaj
-                    prázdne pri bonusoch a jednorazových príjmoch.
+                    Vytvorí sa mesačná šablóna s dňom zo zadaného dátumu; táto položka sa zaradí ako
+                    prvá realizácia (prepojená platba), aby sa výška v mesiaci nepočítala dvakrát.
                   </span>
-                </label>
-              )}
+                )}
+              </label>
+
+              {repeatMode === "once" &&
+                recurringPlansMatchingDirection.length > 0 && (
+                  <label className="block">
+                    <span className="omega-label">
+                      Prepojenie s existujúcou šablónou ({direction === "income" ? "+" : "−"})
+                    </span>
+                    <select
+                      className="omega-input cursor-pointer"
+                      value={fulfillsMovementId}
+                      onChange={(e) => setFulfillsMovementId(e.target.value)}
+                    >
+                      <option value="">Žiadne — jednorazový</option>
+                      {recurringPlansMatchingDirection.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.title} ({r.amount.toLocaleString("sk-SK")} €)
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
 
               <label className="block">
                 <span className="omega-label flex items-center gap-2">
                   <Calendar size={14} className="text-slate-500" aria-hidden />
                   Dátum
+                  {repeatMode === "monthly" && (
+                    <span className="text-[10px] font-normal lowercase text-slate-500">
+                      určuje deň v mesiaci
+                    </span>
+                  )}
                 </span>
                 <input
                   type="date"

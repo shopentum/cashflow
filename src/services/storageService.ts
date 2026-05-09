@@ -8,7 +8,7 @@ import type {
   PaymentType,
   PaymentTypeKind,
   PlanItemStatus,
-  RecurringIncome,
+  RecurringMovement,
   RepeatPattern,
   Transaction,
   TransactionDirection,
@@ -76,48 +76,6 @@ function parseNonNegativeInt(value: unknown, fallback: number): number {
   return Math.max(0, Math.floor(fallback));
 }
 
-/**
- * Migrácie surového JSON na aktuálnu SCHEMA_VERSION pred normalizáciou polí.
- * Príliš nová záloha (schema > SCHEMA_VERSION) → null.
- */
-function migrateRawToLatest(raw: Record<string, unknown>): Record<string, unknown> | null {
-  const vRaw = raw.schemaVersion;
-  let v =
-    typeof vRaw === "number" && Number.isFinite(vRaw) ? Math.floor(vRaw as number) : 1;
-  if (v < 1) v = 1;
-  if (schemaTooNew(v)) return null;
-
-  let acc: Record<string, unknown> = { ...raw };
-
-  while (v < SCHEMA_VERSION) {
-    if (v === 1) {
-      acc = { ...acc, schemaVersion: 2 };
-      v = 2;
-      continue;
-    }
-    if (v === 2) {
-      acc = { ...acc, schemaVersion: 3 };
-      if (!Array.isArray(acc.debtMonthlyPlans)) {
-        acc.debtMonthlyPlans = [];
-      }
-      v = 3;
-      continue;
-    }
-    if (v === 3) {
-      acc = { ...acc, schemaVersion: 4 };
-      if (!Array.isArray(acc.recurringIncomes)) {
-        acc.recurringIncomes = [];
-      }
-      v = 4;
-      continue;
-    }
-    return null;
-  }
-
-  acc.schemaVersion = SCHEMA_VERSION;
-  return acc;
-}
-
 function normalizeDebtMonthlyPlan(row: unknown): DebtMonthlyPlan | null {
   if (!isRecord(row)) return null;
   const debtId =
@@ -159,10 +117,19 @@ function normalizeTransaction(row: unknown): Transaction | null {
   const note = typeof row.note === "string" ? row.note : "";
   const createdAt = normalizeISODateTime(row.createdAt, now);
   const updatedAt = normalizeISODateTime(row.updatedAt, createdAt);
-  let fulfillsRecurringIncomeId: string | null = null;
-  const fr = row.fulfillsRecurringIncomeId;
-  if (typeof fr === "string" && fr.length > 0) {
-    fulfillsRecurringIncomeId = fr;
+  let fulfillsRecurringMovementId: string | null = null;
+  const frNew =
+    typeof row.fulfillsRecurringMovementId === "string"
+      ? row.fulfillsRecurringMovementId
+      : "";
+  const frLegacy =
+    typeof row.fulfillsRecurringIncomeId === "string"
+      ? row.fulfillsRecurringIncomeId
+      : "";
+  const frPick =
+    typeof frNew === "string" && frNew.length > 0 ? frNew : frLegacy;
+  if (typeof frPick === "string" && frPick.length > 0) {
+    fulfillsRecurringMovementId = frPick;
   }
   return {
     id,
@@ -173,13 +140,13 @@ function normalizeTransaction(row: unknown): Transaction | null {
     date,
     status,
     note,
-    fulfillsRecurringIncomeId,
+    fulfillsRecurringMovementId,
     createdAt,
     updatedAt,
   };
 }
 
-function normalizeRecurringIncome(row: unknown): RecurringIncome | null {
+function normalizeRecurringMovement(row: unknown): RecurringMovement | null {
   if (!isRecord(row)) return null;
   const title = parseString(row.title, "").trim();
   const amountRaw = safeFiniteMoney(row.amount, NaN);
@@ -187,8 +154,12 @@ function normalizeRecurringIncome(row: unknown): RecurringIncome | null {
   const typeId =
     typeof row.typeId === "string" && row.typeId.length > 0 ? row.typeId : null;
   if (!typeId) return null;
+  const dirRaw = parseString(row.direction, "") as TransactionDirection;
+  const direction: TransactionDirection =
+    dirRaw === "income" || dirRaw === "expense" ? dirRaw : "income";
   const now = new Date().toISOString();
-  const id = typeof row.id === "string" && row.id.length > 0 ? row.id : newImportedId("recv");
+  const id =
+    typeof row.id === "string" && row.id.length > 0 ? row.id : newImportedId("recv");
   let dayOfMonth = parseNonNegativeInt(row.dayOfMonth, 28);
   if (dayOfMonth < 1) dayOfMonth = 1;
   if (dayOfMonth > 31) dayOfMonth = 31;
@@ -197,6 +168,7 @@ function normalizeRecurringIncome(row: unknown): RecurringIncome | null {
   const createdAt = normalizeISODateTime(row.createdAt, now);
   return {
     id,
+    direction,
     title,
     amount: amountRaw,
     typeId,
@@ -205,6 +177,77 @@ function normalizeRecurringIncome(row: unknown): RecurringIncome | null {
     note,
     createdAt,
   };
+}
+
+/** Surová položka pre migrate v4→v5 (bez straty polí). */
+function movementToRaw(m: RecurringMovement): Record<string, unknown> {
+  return {
+    id: m.id,
+    direction: m.direction,
+    title: m.title,
+    amount: m.amount,
+    typeId: m.typeId,
+    dayOfMonth: m.dayOfMonth,
+    active: m.active,
+    note: m.note,
+    createdAt: m.createdAt,
+  };
+}
+
+/**
+ * Migrácie surového JSON na aktuálnu SCHEMA_VERSION pred normalizáciou polí.
+ */
+function migrateRawToLatest(raw: Record<string, unknown>): Record<string, unknown> | null {
+  const vRaw = raw.schemaVersion;
+  let v =
+    typeof vRaw === "number" && Number.isFinite(vRaw) ? Math.floor(vRaw as number) : 1;
+  if (v < 1) v = 1;
+  if (schemaTooNew(v)) return null;
+
+  let acc: Record<string, unknown> = { ...raw };
+
+  while (v < SCHEMA_VERSION) {
+    if (v === 1) {
+      acc = { ...acc, schemaVersion: 2 };
+      v = 2;
+      continue;
+    }
+    if (v === 2) {
+      acc = { ...acc, schemaVersion: 3 };
+      if (!Array.isArray(acc.debtMonthlyPlans)) {
+        acc.debtMonthlyPlans = [];
+      }
+      v = 3;
+      continue;
+    }
+    if (v === 3) {
+      acc = { ...acc, schemaVersion: 4 };
+      if (!Array.isArray(acc.recurringIncomes)) {
+        acc.recurringIncomes = [];
+      }
+      v = 4;
+      continue;
+    }
+    if (v === 4) {
+      acc = { ...acc, schemaVersion: 5 };
+      const ri = Array.isArray(acc.recurringIncomes)
+        ? (acc.recurringIncomes as unknown[])
+        : [];
+      const mapped: Record<string, unknown>[] = [];
+      for (const item of ri) {
+        const m = normalizeRecurringMovement(item);
+        if (m) mapped.push(movementToRaw(m));
+      }
+      acc.recurringMovements = mapped;
+      delete acc.recurringIncomes;
+      v = 5;
+      continue;
+    }
+    return null;
+  }
+
+  acc.schemaVersion = SCHEMA_VERSION;
+  return acc;
 }
 
 function normalizePaymentType(row: unknown): PaymentType | null {
@@ -352,7 +395,7 @@ function parseNormalizedState(raw: unknown): CashflowAppState | null {
   const paymentTypes = mapArray(migrated.paymentTypes, normalizePaymentType);
   const debts = mapArray(migrated.debts, normalizeDebt);
   const paymentPlanItems = mapArray(migrated.paymentPlanItems, normalizePaymentPlanItem);
-  const recurringIncomes = mapArray(migrated.recurringIncomes, normalizeRecurringIncome);
+  const recurringMovements = mapArray(migrated.recurringMovements, normalizeRecurringMovement);
   const debtMonthlyPlans = mapArray(migrated.debtMonthlyPlans, normalizeDebtMonthlyPlan);
 
   return {
@@ -365,7 +408,7 @@ function parseNormalizedState(raw: unknown): CashflowAppState | null {
     paymentTypes,
     debts,
     paymentPlanItems,
-    recurringIncomes,
+    recurringMovements,
     debtMonthlyPlans,
   };
 }

@@ -1,10 +1,15 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
-import type { CashflowAppState, RecurringIncome } from "@/types/finance";
+import type {
+  CashflowAppState,
+  RecurringMovement,
+  TransactionDirection,
+} from "@/types/finance";
+import { cn } from "@/lib/utils";
 
 type Props = {
   state: CashflowAppState;
-  onUpsert: (row: RecurringIncome) => void;
+  onUpsert: (row: RecurringMovement) => void;
   onDelete: (id: string) => void;
 };
 
@@ -14,23 +19,29 @@ function newId(): string {
   return `recv-${Date.now()}-${seq}`;
 }
 
-function incomeTypes(state: CashflowAppState) {
-  return state.paymentTypes.filter((p) => p.kind === "income");
+function typesForMovement(
+  direction: TransactionDirection,
+  state: CashflowAppState,
+) {
+  return direction === "income"
+    ? state.paymentTypes.filter((p) => p.kind === "income")
+    : state.paymentTypes.filter((p) => p.kind !== "income");
 }
 
 function EditCard({
   row,
-  incomeTypeIds,
+  typeOptions,
   onSave,
   onCancel,
   onRemove,
 }: {
-  row: RecurringIncome;
-  incomeTypeIds: { id: string; label: string }[];
-  onSave: (next: RecurringIncome) => void;
+  row: RecurringMovement;
+  typeOptions: { id: string; label: string }[];
+  onSave: (next: RecurringMovement) => void;
   onCancel: () => void;
   onRemove: () => void;
 }) {
+  const [direction, setDirection] = useState<TransactionDirection>(row.direction);
   const [title, setTitle] = useState(row.title);
   const [amount, setAmount] = useState(String(row.amount));
   const [typeId, setTypeId] = useState(row.typeId);
@@ -39,6 +50,7 @@ function EditCard({
   const [note, setNote] = useState(row.note);
 
   useEffect(() => {
+    setDirection(row.direction);
     setTitle(row.title);
     setAmount(String(row.amount));
     setTypeId(row.typeId);
@@ -54,10 +66,13 @@ function EditCard({
     if (!title.trim() || !Number.isFinite(a) || a < 0) return;
     if (!Number.isFinite(dom) || dom < 1 || dom > 31) return;
     const tid =
-      incomeTypeIds.find((x) => x.id === typeId)?.id ?? incomeTypeIds[0]?.id ?? "";
+      typeOptions.find((o) => o.id === typeId)?.id ??
+      typeOptions[0]?.id ??
+      "";
     if (!tid) return;
     onSave({
       ...row,
+      direction,
       title: title.trim(),
       amount: a,
       typeId: tid,
@@ -68,14 +83,50 @@ function EditCard({
     onCancel();
   }
 
+  const dirSwitch = (
+    <div className="mb-4 flex rounded-2xl border border-white/10 bg-white/[0.06] p-1 sm:col-span-2">
+      <button
+        type="button"
+        onClick={() => {
+          setDirection("income");
+          setTypeId("");
+        }}
+        className={cn(
+          "flex-1 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider",
+          direction === "income"
+            ? "bg-emerald-600 text-white shadow-lg"
+            : "text-slate-500 hover:text-white",
+        )}
+      >
+        Príjem
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setDirection("expense");
+          setTypeId("");
+        }}
+        className={cn(
+          "flex-1 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider",
+          direction === "expense"
+            ? "bg-red-600 text-white shadow-lg"
+            : "text-slate-500 hover:text-white",
+        )}
+      >
+        Výdavok
+      </button>
+    </div>
+  );
+
   return (
     <form
       className="space-y-4 rounded-2xl border border-indigo-500/25 bg-black/35 p-4"
       onSubmit={submit}
     >
+      {dirSwitch}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className="omega-label">Názov (napr. výplata zamestnávateľa)</span>
+          <span className="omega-label">Názov šablóny</span>
           <input
             required
             value={title}
@@ -96,7 +147,7 @@ function EditCard({
           />
         </label>
         <label className="block">
-          <span className="omega-label">Deň výplaty (kalendár)</span>
+          <span className="omega-label">Deň platby (kalendár)</span>
           <input
             required
             type="number"
@@ -108,13 +159,15 @@ function EditCard({
           />
         </label>
         <label className="block sm:col-span-2">
-          <span className="omega-label">Typ platby (musí mať „príjem“)</span>
+          <span className="omega-label">
+            Typ platby ({direction === "income" ? "príjem" : "výdavok"})
+          </span>
           <select
             className="omega-input cursor-pointer"
-            value={typeId || incomeTypeIds[0]?.id}
+            value={typeId || typeOptions[0]?.id || ""}
             onChange={(e) => setTypeId(e.target.value)}
           >
-            {incomeTypeIds.map((o) => (
+            {typeOptions.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
@@ -128,9 +181,7 @@ function EditCard({
             checked={active}
             onChange={(e) => setActive(e.target.checked)}
           />
-          <span className="text-sm text-slate-300">
-            Zahŕňať do počítania (ak vypli, motor túto sumu nedoplní)
-          </span>
+          <span className="text-sm text-slate-300">Zarátať projekciu v motore</span>
         </label>
         <label className="block sm:col-span-2">
           <span className="omega-label">Poznámka</span>
@@ -150,29 +201,40 @@ function EditCard({
           Zrušiť
         </button>
         <button type="button" className="omega-btn-danger ml-auto sm:ml-0" onClick={onRemove}>
-          Zmazať plán
+          Zmazať šablónu
         </button>
       </div>
     </form>
   );
 }
 
-export function RecurringIncomePanel({ state, onUpsert, onDelete }: Props) {
+export function RecurringMovementPanel({ state, onUpsert, onDelete }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const incTypes = incomeTypes(state).map((p) => ({ id: p.id, label: p.name }));
+  const [newDirection, setNewDirection] = useState<TransactionDirection>("expense");
+
+  const incOpts = typesForMovement("income", state).map((p) => ({
+    id: p.id,
+    label: p.name,
+  }));
+  const expOpts = typesForMovement("expense", state).map((p) => ({
+    id: p.id,
+    label: p.name,
+  }));
+  const optsForNew = newDirection === "income" ? incOpts : expOpts;
 
   function addRow(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!incTypes.length) return;
+    if (!optsForNew.length) return;
     const fd = new FormData(e.currentTarget);
     const title = String(fd.get("title") ?? "").trim();
     const amountRaw = Number(String(fd.get("amount") ?? "").replace(",", "."));
     const domRaw = Number.parseInt(String(fd.get("dom") ?? "28"), 10);
     if (!title || !Number.isFinite(amountRaw) || amountRaw < 0) return;
     if (!Number.isFinite(domRaw) || domRaw < 1 || domRaw > 31) return;
-    const typePick = String(fd.get("typeId") ?? incTypes[0]!.id);
+    const typePick = String(fd.get("typeId") ?? optsForNew[0]!.id);
     onUpsert({
       id: newId(),
+      direction: newDirection,
       title,
       amount: amountRaw,
       typeId: typePick,
@@ -186,28 +248,32 @@ export function RecurringIncomePanel({ state, onUpsert, onDelete }: Props) {
 
   return (
     <section className="omega-panel">
-      <h2 className="omega-h2">Pravidelný mesačný príjem</h2>
+      <h2 className="omega-h2">Opakované položky (mesačný plán)</h2>
       <p className="omega-muted mb-8">
-        <strong>Automatické prenesenie:</strong> na mesiac, v ktorom ešte nemáš príjem
-        prepojený s daným plánom, motor zarátava sumu sama (aj v Prehľade). Keď dorazila
-        skutočná platba — v modáli pridania príjmu vyber položku plánu, aby sme nerátali dvakrát.
-        <br />
-        <strong>Jednorazový príjem:</strong> nechaj v transakcií prepojenie prázdne.
+        Pravidelný pohyb zadávaj ako šablónu — motor automaticky zarátava výšku mesiac čo mesiac do
+        Prehľadu, kým v danom kalendárnom mesiaci nepridáš transakciu prepojenú s touto položkou (
+        formulár → Opakovanie / prepojenie). Jednorazové pohyby nechávaj bez šablóny.
       </p>
 
-      {!incTypes.length && (
+      {(incOpts.length === 0 || expOpts.length === 0) && (
         <p className="mb-8 rounded-xl border border-amber-500/25 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">
-          Najskôr v časti Typy vytvor platobný typ s druhom „Príjem“.
+          {!incOpts.length && "Potrebuješ aspoň jeden platobný typ „Príjem“. "}
+          {!expOpts.length && "Potrebuješ aspoň jeden typ výdavkov (nie príjem). "}
+          Upraviť viete v sekcii Typy.
         </p>
       )}
 
       <ul className="mb-10 space-y-3">
-        {(state.recurringIncomes ?? []).map((row) =>
-          editingId === row.id ? (
+        {(state.recurringMovements ?? []).map((row) => {
+          const typeOptions = typesForMovement(row.direction, state).map((p) => ({
+            id: p.id,
+            label: p.name,
+          }));
+          return editingId === row.id ? (
             <li key={row.id}>
               <EditCard
                 row={row}
-                incomeTypeIds={incTypes}
+                typeOptions={typeOptions}
                 onCancel={() => setEditingId(null)}
                 onSave={onUpsert}
                 onRemove={() => {
@@ -219,6 +285,16 @@ export function RecurringIncomePanel({ state, onUpsert, onDelete }: Props) {
           ) : (
             <li key={row.id}>
               <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-black/25 px-4 py-4">
+                <div
+                  className={cn(
+                    "shrink-0 rounded-lg px-2 py-1 text-[10px] font-black uppercase",
+                    row.direction === "income"
+                      ? "bg-emerald-500/25 text-emerald-300"
+                      : "bg-red-500/20 text-red-300",
+                  )}
+                >
+                  {row.direction === "income" ? "Pri" : "Výd"}
+                </div>
                 <div
                   className="h-10 w-10 shrink-0 rounded-xl ring-1 ring-white/15"
                   style={{
@@ -237,47 +313,73 @@ export function RecurringIncomePanel({ state, onUpsert, onDelete }: Props) {
                   type="button"
                   className="omega-btn-ghost shrink-0"
                   onClick={() => setEditingId(row.id)}
-                  disabled={!incTypes.length}
+                  disabled={!incOpts.length && !expOpts.length}
                 >
                   Upraviť
                 </button>
               </div>
             </li>
-          ),
-        )}
+          );
+        })}
       </ul>
 
-      {!!incTypes.length && (
+      {!!optsForNew.length && (
         <form
           className="space-y-6 rounded-3xl border border-white/10 bg-black/20 p-6 md:p-8"
           onSubmit={addRow}
         >
           <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">
-            Nový pravidelný príjem
+            Nová mesačná šablóna
           </h3>
+          <div className="flex rounded-2xl border border-white/10 bg-white/[0.06] p-1">
+            <button
+              type="button"
+              onClick={() => setNewDirection("income")}
+              className={cn(
+                "flex-1 rounded-xl py-3 text-xs font-bold uppercase tracking-wider",
+                newDirection === "income"
+                  ? "bg-emerald-600 text-white shadow-lg"
+                  : "text-slate-500 hover:text-white",
+              )}
+            >
+              Pravidelný príjem
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewDirection("expense")}
+              className={cn(
+                "flex-1 rounded-xl py-3 text-xs font-bold uppercase tracking-wider",
+                newDirection === "expense"
+                  ? "bg-red-600 text-white shadow-lg"
+                  : "text-slate-500 hover:text-white",
+              )}
+            >
+              Pravidelný výdavok
+            </button>
+          </div>
           <label className="block">
             <span className="omega-label">Názov</span>
-            <input name="title" required placeholder="Mesiacný príjem" className="omega-input" />
+            <input name="title" required className="omega-input" placeholder="Hypotéka / výplata" />
           </label>
           <label className="block">
             <span className="omega-label">Suma (EUR)</span>
             <input name="amount" required type="number" step="0.01" min={0} className="omega-input" />
           </label>
           <label className="block">
-            <span className="omega-label">Deň výplaty</span>
+            <span className="omega-label">Deň platby</span>
             <input
               name="dom"
               type="number"
               min={1}
               max={31}
-              defaultValue={28}
+              defaultValue={newDirection === "income" ? 15 : 1}
               className="omega-input max-w-[8rem]"
             />
           </label>
           <label className="block">
-            <span className="omega-label">Typ príjmu</span>
-            <select name="typeId" className="omega-input cursor-pointer">
-              {incTypes.map((o) => (
+            <span className="omega-label">Typ</span>
+            <select key={newDirection} name="typeId" className="omega-input cursor-pointer">
+              {optsForNew.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
@@ -285,7 +387,7 @@ export function RecurringIncomePanel({ state, onUpsert, onDelete }: Props) {
             </select>
           </label>
           <button type="submit" className="omega-btn-primary">
-            Pridať plán príjmu
+            Pridať šablónu
           </button>
         </form>
       )}

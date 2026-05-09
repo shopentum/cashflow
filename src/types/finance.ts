@@ -29,23 +29,25 @@ export interface Transaction {
   date: string;
   status: TransactionStatus;
   note: string;
-  /** Ak je nastavené: príjem v danom mesiaci „splní“ projekciu šablóny pravidelného príjmu — motor nezaráta plán druhýkrát. */
-  fulfillsRecurringIncomeId: string | null;
+  /**
+   * Transakcia v danom kalendárnom mesiaci „splní“ projekciu mesačnej šablóny –
+   * motor nevyrátava plán druhýkrát.
+   */
+  fulfillsRecurringMovementId: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 /**
- * Mesačne opakovaný príjem (náhľad v motore bez ďalšieho kliknutia mesiac čo mesiac).
- * Jednorázový príjem = obyčajná transakcia bez `fulfillsRecurringIncomeId`.
+ * Mesačná šablóna pohybu (príjem aj výdavok). Jednorázový pohyb = bez záznamu tu.
  */
-export interface RecurringIncome {
+export interface RecurringMovement {
   id: string;
+  direction: TransactionDirection;
   title: string;
   amount: number;
-  /** Typ platby s `kind: income`. */
   typeId: string;
-  /** Kalendárny deň výplaty (1–31, pri neplatných dňoch v mesiaci sa zráta na posledný deň mesiaca). */
+  /** Kalendárny deň v mesiaci (1–31, neplatný deň sa zúži na koniec mesiaca). */
   dayOfMonth: number;
   active: boolean;
   note: string;
@@ -110,7 +112,7 @@ export interface CashflowAppState {
   paymentTypes: PaymentType[];
   debts: Debt[];
   paymentPlanItems: PaymentPlanItem[];
-  recurringIncomes: RecurringIncome[];
+  recurringMovements: RecurringMovement[];
   /** Voliteľné mesačné úpravy len pre `dueFlexibility: flexible` dlhy. */
   debtMonthlyPlans: DebtMonthlyPlan[];
 }

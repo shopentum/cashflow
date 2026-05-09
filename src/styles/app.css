@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/** Native selects / datalists inherit light popups unless the page asks for dark UI. */
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+}
+
 @layer components {
   .omega-panel {
     @apply rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 backdrop-blur-sm md:p-8;
@@ -27,6 +34,12 @@
 
   .omega-input {
     @apply w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30;
+    color-scheme: dark;
+  }
+
+  .omega-input option {
+    background-color: rgb(15 23 42);
+    color: rgb(226 232 240);
   }
 
   .omega-btn-primary {

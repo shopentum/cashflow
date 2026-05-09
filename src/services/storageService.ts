@@ -8,6 +8,7 @@ import type {
   PaymentType,
   PaymentTypeKind,
   PlanItemStatus,
+  RecurringIncome,
   RepeatPattern,
   Transaction,
   TransactionDirection,
@@ -102,6 +103,14 @@ function migrateRawToLatest(raw: Record<string, unknown>): Record<string, unknow
       v = 3;
       continue;
     }
+    if (v === 3) {
+      acc = { ...acc, schemaVersion: 4 };
+      if (!Array.isArray(acc.recurringIncomes)) {
+        acc.recurringIncomes = [];
+      }
+      v = 4;
+      continue;
+    }
     return null;
   }
 
@@ -150,6 +159,11 @@ function normalizeTransaction(row: unknown): Transaction | null {
   const note = typeof row.note === "string" ? row.note : "";
   const createdAt = normalizeISODateTime(row.createdAt, now);
   const updatedAt = normalizeISODateTime(row.updatedAt, createdAt);
+  let fulfillsRecurringIncomeId: string | null = null;
+  const fr = row.fulfillsRecurringIncomeId;
+  if (typeof fr === "string" && fr.length > 0) {
+    fulfillsRecurringIncomeId = fr;
+  }
   return {
     id,
     title: title || "Bez názvu",
@@ -159,8 +173,37 @@ function normalizeTransaction(row: unknown): Transaction | null {
     date,
     status,
     note,
+    fulfillsRecurringIncomeId,
     createdAt,
     updatedAt,
+  };
+}
+
+function normalizeRecurringIncome(row: unknown): RecurringIncome | null {
+  if (!isRecord(row)) return null;
+  const title = parseString(row.title, "").trim();
+  const amountRaw = safeFiniteMoney(row.amount, NaN);
+  if (!title || !Number.isFinite(amountRaw) || amountRaw < 0) return null;
+  const typeId =
+    typeof row.typeId === "string" && row.typeId.length > 0 ? row.typeId : null;
+  if (!typeId) return null;
+  const now = new Date().toISOString();
+  const id = typeof row.id === "string" && row.id.length > 0 ? row.id : newImportedId("recv");
+  let dayOfMonth = parseNonNegativeInt(row.dayOfMonth, 28);
+  if (dayOfMonth < 1) dayOfMonth = 1;
+  if (dayOfMonth > 31) dayOfMonth = 31;
+  const note = typeof row.note === "string" ? row.note : "";
+  const active = typeof row.active === "boolean" ? row.active : Boolean(row.active);
+  const createdAt = normalizeISODateTime(row.createdAt, now);
+  return {
+    id,
+    title,
+    amount: amountRaw,
+    typeId,
+    dayOfMonth,
+    active,
+    note,
+    createdAt,
   };
 }
 
@@ -309,6 +352,7 @@ function parseNormalizedState(raw: unknown): CashflowAppState | null {
   const paymentTypes = mapArray(migrated.paymentTypes, normalizePaymentType);
   const debts = mapArray(migrated.debts, normalizeDebt);
   const paymentPlanItems = mapArray(migrated.paymentPlanItems, normalizePaymentPlanItem);
+  const recurringIncomes = mapArray(migrated.recurringIncomes, normalizeRecurringIncome);
   const debtMonthlyPlans = mapArray(migrated.debtMonthlyPlans, normalizeDebtMonthlyPlan);
 
   return {
@@ -321,6 +365,7 @@ function parseNormalizedState(raw: unknown): CashflowAppState | null {
     paymentTypes,
     debts,
     paymentPlanItems,
+    recurringIncomes,
     debtMonthlyPlans,
   };
 }

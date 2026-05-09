@@ -3,6 +3,7 @@ import { allocateDebts } from "@/services/debtAllocationEngine";
 import {
   calendarMonthBoundsLocal,
   dateToLocalISO,
+  dayInCalendarMonth,
   isDateInInclusiveRange,
   rollingWindowBoundsInclusive,
 } from "@/utils/dateUtils";
@@ -79,6 +80,58 @@ function incomeInRange(
   return roundMoney(s);
 }
 
+function padMonthPart(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Jedinečné YYYY-MM, ktorých kalendárna časť sa dotýka uzavretého rozsahu dátumov. */
+function uniqYearMonthsIntersectingRange(
+  rangeStartISO: string,
+  rangeEndISO: string,
+): string[] {
+  const d0 = new Date(rangeStartISO + "T12:00:00");
+  const d1 = new Date(rangeEndISO + "T12:00:00");
+  if (Number.isNaN(d0.getTime()) || Number.isNaN(d1.getTime())) return [];
+  if (rangeStartISO > rangeEndISO) return [];
+  const cur = new Date(d0.getFullYear(), d0.getMonth(), 1);
+  const stop = new Date(d1.getFullYear(), d1.getMonth(), 1);
+  const out: string[] = [];
+  for (; cur <= stop; cur.setMonth(cur.getMonth() + 1)) {
+    out.push(`${cur.getFullYear()}-${padMonthPart(cur.getMonth() + 1)}`);
+  }
+  return out;
+}
+
+/** Prírastok mesačne opakovaného príjmu: ak výplatný deň padne do výpočtu a v danom kalendárnom mesiaci chýba transakcia s `fulfillsRecurringIncomeId`. */
+function projectedRecurringIncomeInRange(
+  state: CashflowAppState,
+  rangeStart: string,
+  rangeEnd: string,
+): number {
+  const list = state.recurringIncomes ?? [];
+  if (list.length === 0 || rangeStart > rangeEnd) return 0;
+  let plus = 0;
+  for (const ym of uniqYearMonthsIntersectingRange(rangeStart, rangeEnd)) {
+    const monthFirst = `${ym}-01`;
+    for (const ri of list) {
+      if (!ri.active || ri.amount <= 0) continue;
+      const pt = state.paymentTypes.find((p) => p.id === ri.typeId);
+      if (!pt || pt.kind !== "income") continue;
+      const occISO = dayInCalendarMonth(monthFirst, ri.dayOfMonth);
+      if (!isDateInInclusiveRange(occISO, rangeStart, rangeEnd)) continue;
+      const fulfilled = state.transactions.some(
+        (t) =>
+          t.direction === "income" &&
+          isCountedForCashflow(t) &&
+          t.fulfillsRecurringIncomeId === ri.id &&
+          t.date.startsWith(`${ym}-`),
+      );
+      if (!fulfilled) plus += ri.amount;
+    }
+  }
+  return roundMoney(plus);
+}
+
 function rollupRangeParts(
   state: CashflowAppState,
   start: string,
@@ -132,17 +185,16 @@ function rollupRangeParts(
     flex += t.amount;
   }
 
-  income = roundMoney(income);
+  income = roundMoney(income + projectedRecurringIncomeInRange(state, start, end));
   fixed = roundMoney(fixed);
   flex = roundMoney(flex);
   debtLedger = roundMoney(debtLedger);
 
   const anchorBounds = calendarMonthBoundsLocal(anchor);
   const monthKey = anchorBounds.start.slice(0, 7);
-  const incomeAnchorMonth = incomeInRange(
-    state,
-    anchorBounds.start,
-    anchorBounds.end,
+  const incomeAnchorMonth = roundMoney(
+    incomeInRange(state, anchorBounds.start, anchorBounds.end) +
+      projectedRecurringIncomeInRange(state, anchorBounds.start, anchorBounds.end),
   );
 
   let plannedDebt =

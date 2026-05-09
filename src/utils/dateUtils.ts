@@ -69,3 +69,18 @@ export function isDateInInclusiveRange(
 export function yearMonthLocal(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
+
+/**
+ * Konkrétny kalendárny deň `dayOfMonth` v mesiaci určenom začiatkom (napr. 2026-05-01).
+ * Ak deň vyjde mimo počtu dní v mesiaci, použije sa posledný deň mesiaca.
+ */
+export function dayInCalendarMonth(monthStartISO: string, dayOfMonth: number): string {
+  const match = /^(\d{4})-(\d{2})-\d{2}$/.exec(monthStartISO);
+  if (!match) return monthStartISO;
+  const y = Number(match[1]);
+  const mo = Number(match[2]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo)) return monthStartISO;
+  const lastDay = new Date(y, mo, 0).getDate();
+  const day = Math.min(Math.max(1, Math.floor(dayOfMonth)), lastDay);
+  return `${match[1]}-${match[2]}-${pad(day)}`;
+}

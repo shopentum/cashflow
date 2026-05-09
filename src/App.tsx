@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LineChart,
   PlusCircle,
+  Repeat2,
   Tags,
   WalletCards,
 } from "lucide-react";
@@ -12,6 +13,7 @@ import { CashflowTimeline } from "@/components/CashflowTimeline";
 import { Dashboard } from "@/components/Dashboard";
 import { DebtBoard } from "@/components/DebtBoard";
 import { SimulationPanel } from "@/components/SimulationPanel";
+import { RecurringIncomePanel } from "@/components/RecurringIncomePanel";
 import { TransactionFormModal } from "@/components/TransactionForm";
 import { TypeManager } from "@/components/TypeManager";
 import { loadState, saveState } from "@/services/storageService";
@@ -21,6 +23,7 @@ import type {
   Debt,
   DebtMonthlyPlan,
   PaymentType,
+  RecurringIncome,
   Transaction,
 } from "@/types/finance";
 
@@ -28,6 +31,7 @@ type Tab =
   | "dashboard"
   | "transaction"
   | "types"
+  | "recurring"
   | "debts"
   | "timeline"
   | "simulation";
@@ -42,6 +46,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { id: "dashboard", label: "Prehľad", Icon: LayoutDashboard },
   { id: "transaction", label: "Transakcie", Icon: CreditCard },
   { id: "types", label: "Typy", Icon: Tags },
+  { id: "recurring", label: "Príjmy (plán)", Icon: Repeat2 },
   { id: "debts", label: "Dlh", Icon: WalletCards },
   { id: "timeline", label: "Časová os", Icon: CalendarDays },
   { id: "simulation", label: "Simulácia", Icon: LineChart },
@@ -94,6 +99,7 @@ export function App() {
       const now = new Date().toISOString();
       const row: Transaction = {
         ...partial,
+        fulfillsRecurringIncomeId: partial.fulfillsRecurringIncomeId ?? null,
         id: newTxId(),
         createdAt: now,
         updatedAt: now,
@@ -119,6 +125,28 @@ export function App() {
     setState((s) => ({
       ...s,
       paymentTypes: s.paymentTypes.filter((p) => p.id !== id),
+    }));
+  }, []);
+
+  const upsertRecurringIncome = useCallback((row: RecurringIncome) => {
+    setState((s) => {
+      const list = [...(s.recurringIncomes ?? [])];
+      const idx = list.findIndex((x) => x.id === row.id);
+      if (idx === -1) return { ...s, recurringIncomes: [...list, row] };
+      list[idx] = row;
+      return { ...s, recurringIncomes: list };
+    });
+  }, []);
+
+  const deleteRecurringIncome = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      recurringIncomes: (s.recurringIncomes ?? []).filter((x) => x.id !== id),
+      transactions: s.transactions.map((t) =>
+        t.fulfillsRecurringIncomeId === id
+          ? { ...t, fulfillsRecurringIncomeId: null }
+          : t,
+      ),
     }));
   }, []);
 
@@ -268,7 +296,11 @@ export function App() {
                     </p>
                   ) : (
                     <ul className="divide-y divide-white/10 rounded-2xl border border-white/5 bg-black/15">
-                      {state.transactions.slice(0, 20).map((t) => (
+                      {state.transactions.slice(0, 20).map((t) => {
+                        const rp = t.fulfillsRecurringIncomeId
+                          ? state.recurringIncomes?.find((r) => r.id === t.fulfillsRecurringIncomeId)
+                          : undefined;
+                        return (
                         <li
                           key={t.id}
                           className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 text-sm md:px-5"
@@ -283,13 +315,19 @@ export function App() {
                           >
                             <span aria-hidden>{t.direction === "income" ? "+" : "−"}</span>
                             {t.title}
+                            {rp ? (
+                              <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                                Plán · {rp.title}
+                              </span>
+                            ) : null}
                           </span>
                           <span className="tabular-nums font-medium text-white">
                             {t.amount} €
                           </span>
                           <span className="text-xs text-slate-500">{t.date}</span>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                   )}
                 </section>
@@ -300,6 +338,13 @@ export function App() {
                 state={state}
                 onUpsertType={upsertType}
                 onDeleteType={deleteType}
+              />
+            )}
+            {tab === "recurring" && (
+              <RecurringIncomePanel
+                state={state}
+                onUpsert={upsertRecurringIncome}
+                onDelete={deleteRecurringIncome}
               />
             )}
             {tab === "debts" && (

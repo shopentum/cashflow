@@ -63,10 +63,16 @@ export function TransactionFormModal({
   const [date, setDate] = useState(todayISO());
   const [status, setStatus] = useState<TransactionStatus>("planned");
   const [note, setNote] = useState("");
+  const [fulfillsRecurringIncomeId, setFulfillsRecurringIncomeId] = useState("");
 
   const filteredTypes = useMemo(
     () => paymentTypesForDirection(state.paymentTypes, direction),
     [state.paymentTypes, direction],
+  );
+
+  const recurringPlansActive = useMemo(
+    () => (state.recurringIncomes ?? []).filter((r) => r.active),
+    [state.recurringIncomes],
   );
 
   useEffect(() => {
@@ -76,6 +82,10 @@ export function TransactionFormModal({
   }, [filteredTypes, typeId]);
 
   useEffect(() => {
+    setFulfillsRecurringIncomeId("");
+  }, [direction]);
+
+  useEffect(() => {
     if (!open) return;
     setDate(todayISO());
     setDirection("expense");
@@ -83,7 +93,13 @@ export function TransactionFormModal({
     setAmount("");
     setStatus("planned");
     setNote("");
+    setFulfillsRecurringIncomeId("");
   }, [open]);
+
+  useEffect(() => {
+    const ids = new Set(recurringPlansActive.map((r) => r.id));
+    setFulfillsRecurringIncomeId((prev) => (prev && ids.has(prev) ? prev : ""));
+  }, [recurringPlansActive]);
 
   const handleSubmit = useCallback(
     (e: FormEvent) => {
@@ -92,6 +108,9 @@ export function TransactionFormModal({
       if (!title.trim() || !Number.isFinite(amt) || amt < 0) return;
       const tid = typeId || filteredTypes[0]?.id || state.paymentTypes[0]?.id;
       if (!tid) return;
+      const recurringIdRaw = fulfillsRecurringIncomeId.trim();
+      const fulfillsId =
+        direction === "income" && recurringIdRaw ? recurringIdRaw : null;
       onAdd({
         title: title.trim() || "Bez názvu",
         amount: amt,
@@ -100,6 +119,7 @@ export function TransactionFormModal({
         date,
         status,
         note: note.trim(),
+        fulfillsRecurringIncomeId: fulfillsId,
       });
       onClose();
     },
@@ -108,6 +128,7 @@ export function TransactionFormModal({
       date,
       direction,
       filteredTypes,
+      fulfillsRecurringIncomeId,
       note,
       onAdd,
       onClose,
@@ -161,7 +182,10 @@ export function TransactionFormModal({
               <div className="flex rounded-2xl border border-white/10 bg-white/5 p-1">
                 <button
                   type="button"
-                  onClick={() => setDirection("expense")}
+                  onClick={() => {
+                    setDirection("expense");
+                    setFulfillsRecurringIncomeId("");
+                  }}
                   className={cn(
                     "flex flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-black uppercase tracking-widest transition-all",
                     direction === "expense"
@@ -174,7 +198,10 @@ export function TransactionFormModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDirection("income")}
+                  onClick={() => {
+                    setDirection("income");
+                    setFulfillsRecurringIncomeId("");
+                  }}
                   className={cn(
                     "flex flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-black uppercase tracking-widest transition-all",
                     direction === "income"
@@ -246,6 +273,28 @@ export function TransactionFormModal({
                   ))}
                 </select>
               </label>
+
+              {direction === "income" && recurringPlansActive.length > 0 && (
+                <label className="block">
+                  <span className="omega-label">Prepojenie s plánom príjmu</span>
+                  <select
+                    className="omega-input cursor-pointer"
+                    value={fulfillsRecurringIncomeId}
+                    onChange={(e) => setFulfillsRecurringIncomeId(e.target.value)}
+                  >
+                    <option value="">Jednorazový / bez plánu</option>
+                    {recurringPlansActive.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.title} ({r.amount.toLocaleString("sk-SK")} €)
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-2 block text-[11px] leading-relaxed text-slate-500">
+                    Vyber položku, aby sa mesačná projekcia tohto plánu nevyrátala dvakrát. Nechaj
+                    prázdne pri bonusoch a jednorazových príjmoch.
+                  </span>
+                </label>
+              )}
 
               <label className="block">
                 <span className="omega-label flex items-center gap-2">

@@ -118,9 +118,16 @@ export function App() {
   const transactionsInCalendarMonth = useMemo(() => {
     const anchor = anchorDateFromYearMonth(calendarMonthYM);
     const { start, end } = calendarMonthBoundsLocal(anchor);
-    return state.transactions.filter((t) =>
-      isDateInInclusiveRange(t.date, start, end),
-    );
+    return state.transactions
+      .filter((t) => isDateInInclusiveRange(t.date, start, end))
+      .slice()
+      .sort((a, b) => {
+        const byDate = a.date.localeCompare(b.date);
+        if (byDate !== 0) return byDate;
+        const byCreated = a.createdAt.localeCompare(b.createdAt);
+        if (byCreated !== 0) return byCreated;
+        return a.id.localeCompare(b.id);
+      });
   }, [state.transactions, calendarMonthYM]);
 
   useEffect(() => {

@@ -82,6 +82,16 @@ export function anchorDateFromYearMonth(yearMonth: string): Date {
   return new Date(y, mo - 1, 15);
 }
 
+/** Slovenský názov kalendárneho mesiaca a roka pre `YYYY-MM`. */
+export function formatYearMonthLabelSk(yearMonth: string): string {
+  const d = anchorDateFromYearMonth(yearMonth);
+  const raw = new Intl.DateTimeFormat("sk-SK", {
+    month: "long",
+    year: "numeric",
+  }).format(d);
+  return raw.charAt(0).toLocaleUpperCase("sk-SK") + raw.slice(1);
+}
+
 /** Posun `YYYY-MM` o `deltaMonths` v lokálnom kalendári. */
 export function shiftYearMonth(yearMonth: string, deltaMonths: number): string {
   const match = /^(\d{4})-(\d{2})$/.exec(yearMonth.trim());

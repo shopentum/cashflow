@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
   LayoutDashboard,
   LineChart,
@@ -18,6 +20,14 @@ import { TransactionFormModal, type RepeatMode } from "@/components/TransactionF
 import { TypeManager } from "@/components/TypeManager";
 import { loadState, saveState } from "@/services/storageService";
 import { cn } from "@/lib/utils";
+import {
+  anchorDateFromYearMonth,
+  calendarMonthBoundsLocal,
+  formatYearMonthLabelSk,
+  isDateInInclusiveRange,
+  shiftYearMonth,
+  yearMonthLocal,
+} from "@/utils/dateUtils";
 import type {
   CashflowAppState,
   Debt,
@@ -100,7 +110,18 @@ function NavButtons({
 export function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [transactionModalOpen, setTransactionModalOpen] = useState(false);
+  const [calendarMonthYM, setCalendarMonthYM] = useState<string>(() =>
+    yearMonthLocal(),
+  );
   const [state, setState] = useState<CashflowAppState>(() => loadState());
+
+  const transactionsInCalendarMonth = useMemo(() => {
+    const anchor = anchorDateFromYearMonth(calendarMonthYM);
+    const { start, end } = calendarMonthBoundsLocal(anchor);
+    return state.transactions.filter((t) =>
+      isDateInInclusiveRange(t.date, start, end),
+    );
+  }, [state.transactions, calendarMonthYM]);
 
   useEffect(() => {
     saveState(state);
@@ -295,6 +316,8 @@ export function App() {
             {tab === "dashboard" && (
               <Dashboard
                 state={state}
+                selectedMonth={calendarMonthYM}
+                onSelectedMonthChange={setCalendarMonthYM}
                 onChangeBalance={(v) => setState((s) => ({ ...s, currentBalance: v }))}
                 onChangeBuffer={(v) => setState((s) => ({ ...s, safetyBuffer: v }))}
                 onChangeDebtPercent={(v) =>
@@ -310,34 +333,82 @@ export function App() {
             )}
             {tab === "transaction" && (
               <>
-                <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <h2 className="omega-h2 mb-2">Transakcie</h2>
                     <p className="text-sm text-slate-400">
-                      Zobrazenie pohybov podľa lokálneho stavu aplikácie.
+                      Kalendárny mesiac z horného vstupu je rovnaký ako v&nbsp;položke „Mesačný
+                      prehľad“ na karte Prehľad. Zobrazené sú výhradne záznamy, ktorých dátum padá do
+                      vybraného mesiaca vrátane posledného kalendárneho dňa mesiaca.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setTransactionModalOpen(true)}
-                    className="omega-btn-primary inline-flex items-center justify-center gap-2 self-start sm:self-center"
-                  >
-                    <PlusCircle className="h-4 w-4" aria-hidden />
-                    Pridať pohyb
-                  </button>
+                  <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                        aria-label="Predchádzajúci mesiac"
+                        onClick={() =>
+                          setCalendarMonthYM((ym) =>
+                            shiftYearMonth(ym, -1),
+                          )
+                        }
+                      >
+                        <ChevronLeft size={20} aria-hidden />
+                      </button>
+                      <input
+                        type="month"
+                        className="omega-input w-auto min-w-[11rem]"
+                        value={calendarMonthYM}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v) setCalendarMonthYM(v);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                        aria-label="Ďalší mesiac"
+                        onClick={() =>
+                          setCalendarMonthYM((ym) => shiftYearMonth(ym, 1))
+                        }
+                      >
+                        <ChevronRight size={20} aria-hidden />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setTransactionModalOpen(true)}
+                      className="omega-btn-primary inline-flex items-center justify-center gap-2"
+                    >
+                      <PlusCircle className="h-4 w-4" aria-hidden />
+                      Pridať pohyb
+                    </button>
+                  </div>
                 </div>
 
                 <section className="omega-panel">
-                  <h2 className="mb-6 text-lg font-semibold text-white">
-                    Posledné transakcie
-                  </h2>
+                  <div className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <h2 className="text-lg font-semibold text-white">
+                      Položky v mesiaci
+                    </h2>
+                    <span className="text-xs text-slate-500 tabular-nums">
+                      Počet: {transactionsInCalendarMonth.length}
+                    </span>
+                  </div>
                   {state.transactions.length === 0 ? (
                     <p className="text-sm text-slate-500">
                       Zatiaľ žiadne záznamy — použitím „Pridať pohyb“ vytvor prvú položku.
                     </p>
+                  ) : transactionsInCalendarMonth.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      V&nbsp;kalendárnom mesiaci{" "}
+                      <strong>{formatYearMonthLabelSk(calendarMonthYM)}</strong> nie sú žiadne
+                      transakcie. Zmen mesiac horným vstupom alebo pridaj pohyb na dátum v tomto mesiaci.
+                    </p>
                   ) : (
                     <ul className="divide-y divide-white/10 rounded-2xl border border-white/5 bg-black/15">
-                      {state.transactions.slice(0, 20).map((t) => {
+                      {transactionsInCalendarMonth.map((t) => {
                         const rp = t.fulfillsRecurringMovementId
                           ? state.recurringMovements?.find((r) => r.id === t.fulfillsRecurringMovementId)
                           : undefined;
@@ -358,7 +429,7 @@ export function App() {
                             {t.title}
                             {rp ? (
                               <span className="mt-1 block text-[11px] font-normal text-slate-500">
-                                Plán · {rp.title}
+                                Šablóna · {rp.title}
                               </span>
                             ) : null}
                           </span>

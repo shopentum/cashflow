@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatMoneyEUR, roundMoney } from "@/utils/moneyUtils";
 import { allocateDebts } from "@/services/debtAllocationEngine";
@@ -9,13 +9,16 @@ import {
 import type { CashflowAppState } from "@/types/finance";
 import {
   anchorDateFromYearMonth,
+  formatYearMonthLabelSk,
   shiftYearMonth,
-  yearMonthLocal,
 } from "@/utils/dateUtils";
 import { cn } from "@/lib/utils";
 
 type Props = {
   state: CashflowAppState;
+  /** Kalendárny mesiac aplikácie `YYYY-MM` (zdieľaný napr. s kartou transakcie). */
+  selectedMonth: string;
+  onSelectedMonthChange: (yearMonth: string) => void;
   onChangeBalance: (value: number) => void;
   onChangeBuffer: (value: number) => void;
   onChangeDebtPercent: (value: number) => void;
@@ -24,14 +27,13 @@ type Props = {
 
 export function Dashboard({
   state,
+  selectedMonth,
+  onSelectedMonthChange,
   onChangeBalance,
   onChangeBuffer,
   onChangeDebtPercent,
   onToggleEmergencyFreeze,
 }: Props) {
-  const [selectedMonth, setSelectedMonth] = useState<string>(() =>
-    yearMonthLocal(),
-  );
   const monthAnchorDate = useMemo(
     () => anchorDateFromYearMonth(selectedMonth),
     [selectedMonth],
@@ -49,14 +51,7 @@ export function Dashboard({
     selectedMonth,
   );
 
-  const monthLabelPretty = useMemo(() => {
-    const d = anchorDateFromYearMonth(selectedMonth);
-    const raw = new Intl.DateTimeFormat("sk-SK", {
-      month: "long",
-      year: "numeric",
-    }).format(d);
-    return raw.charAt(0).toLocaleUpperCase("sk-SK") + raw.slice(1);
-  }, [selectedMonth]);
+  const monthLabelPretty = formatYearMonthLabelSk(selectedMonth);
 
   const totalExpensesInMonth = roundMoney(
     summary.totalFixedExpensesThisMonth +
@@ -83,7 +78,7 @@ export function Dashboard({
             <button
               type="button"
               onClick={() =>
-                setSelectedMonth((ym) => shiftYearMonth(ym, -1))
+                onSelectedMonthChange(shiftYearMonth(selectedMonth, -1))
               }
               className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
               aria-label="Predchádzajúci mesiac"
@@ -96,13 +91,13 @@ export function Dashboard({
               value={selectedMonth}
               onChange={(e) => {
                 const v = e.target.value;
-                if (v) setSelectedMonth(v);
+                if (v) onSelectedMonthChange(v);
               }}
             />
             <button
               type="button"
               onClick={() =>
-                setSelectedMonth((ym) => shiftYearMonth(ym, 1))
+                onSelectedMonthChange(shiftYearMonth(selectedMonth, 1))
               }
               className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
               aria-label="Ďalší mesiac"

@@ -70,6 +70,31 @@ export function yearMonthLocal(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
 
+/** Lokálny stred mesiaca pre `YYYY-MM` (fallback: dnes). */
+export function anchorDateFromYearMonth(yearMonth: string): Date {
+  const match = /^(\d{4})-(\d{2})$/.exec(yearMonth.trim());
+  if (!match) return new Date();
+  const y = Number(match[1]);
+  const mo = Number(match[2]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || mo < 1 || mo > 12) {
+    return new Date();
+  }
+  return new Date(y, mo - 1, 15);
+}
+
+/** Posun `YYYY-MM` o `deltaMonths` v lokálnom kalendári. */
+export function shiftYearMonth(yearMonth: string, deltaMonths: number): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(yearMonth.trim());
+  if (!match) return yearMonthLocal();
+  const y = Number(match[1]);
+  const mo = Number(match[2]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || mo < 1 || mo > 12) {
+    return yearMonthLocal();
+  }
+  const d = new Date(y, mo - 1 + deltaMonths, 15);
+  return yearMonthLocal(d);
+}
+
 /**
  * Konkrétny kalendárny deň `dayOfMonth` v mesiaci určenom začiatkom (napr. 2026-05-01).
  * Ak deň vyjde mimo počtu dní v mesiaci, použije sa posledný deň mesiaca.

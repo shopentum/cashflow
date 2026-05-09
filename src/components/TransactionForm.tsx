@@ -164,13 +164,11 @@ export function TransactionFormModal({
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8">
-          <motion.button
-            type="button"
-            aria-label="Zavrieť"
+          <motion.div
+            aria-hidden="true"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
             className="absolute inset-0 bg-[#020617]/90 backdrop-blur-sm"
           />
           <motion.div
@@ -287,6 +285,11 @@ export function TransactionFormModal({
                     </option>
                   ))}
                 </select>
+                <span className="mt-2 block text-[11px] leading-relaxed text-slate-500">
+                  Tvoja vlastná kategória. Motor ju podľa druhu (príjem, fixný výdavok,
+                  flex / sporenie, dlh…) triedi do výpočtu hotovosti: fixná vs flexibilná položka
+                  vrátane mraziaceho režimu, príjem, alebo logika dlhov.
+                </span>
               </label>
 
               <label className="block">

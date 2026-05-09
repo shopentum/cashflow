@@ -9,6 +9,7 @@ import {
   PlusCircle,
   Repeat2,
   Tags,
+  Trash2,
   WalletCards,
 } from "lucide-react";
 import { CashflowTimeline } from "@/components/CashflowTimeline";
@@ -177,6 +178,14 @@ export function App() {
     },
     [],
   );
+
+  const deleteOneOffTransaction = useCallback((id: string) => {
+    if (!window.confirm("Odstrániť túto jednorázovú položku?")) return;
+    setState((s) => ({
+      ...s,
+      transactions: s.transactions.filter((t) => t.id !== id),
+    }));
+  }, []);
 
   const upsertType = useCallback((pt: PaymentType) => {
     setState((s) => {
@@ -422,11 +431,11 @@ export function App() {
                         return (
                         <li
                           key={t.id}
-                          className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 text-sm md:px-5"
+                          className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm md:px-5"
                         >
                           <span
                             className={cn(
-                              "min-w-0 flex-1 font-semibold",
+                              "min-w-0 flex-1 font-semibold basis-[min-content]",
                               t.direction === "income"
                                 ? "text-emerald-400"
                                 : "text-red-400",
@@ -444,6 +453,17 @@ export function App() {
                             {t.amount} €
                           </span>
                           <span className="text-xs text-slate-500">{t.date}</span>
+                          {!t.fulfillsRecurringMovementId ? (
+                            <button
+                              type="button"
+                              onClick={() => deleteOneOffTransaction(t.id)}
+                              className="ml-auto shrink-0 rounded-xl p-2 text-slate-500 transition-colors hover:bg-red-500/15 hover:text-red-400 md:ml-0"
+                              aria-label="Zmazať položku"
+                              title="Zmazať položku"
+                            >
+                              <Trash2 size={18} aria-hidden />
+                            </button>
+                          ) : null}
                         </li>
                         );
                       })}

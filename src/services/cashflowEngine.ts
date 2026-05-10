@@ -2,7 +2,6 @@ import type { CashflowAppState, PaymentTypeKind, Transaction } from "@/types/fin
 import { allocateDebts } from "@/services/debtAllocationEngine";
 import {
   calendarMonthBoundsLocal,
-  dateToLocalISO,
   dayInCalendarMonth,
   isDateInInclusiveRange,
   rollingWindowBoundsInclusive,
@@ -31,6 +30,7 @@ export interface CashflowTimelinePoint {
   date: string;
   label: string;
   balanceAfter: number;
+  transactionId?: string;
 }
 
 export interface RiskWarning {
@@ -357,12 +357,14 @@ export function summarizeHorizon(state: CashflowAppState): CashflowHorizon {
   };
 }
 
-/** Od „dnes“ nahor chronologicky; zostatok po každej pohybu. */
+/**
+ * Chronologicky všetky pohyby (vrátane minulosti). Zostatky po každej udalosti sú dopočítané
+ * spätne od zadaného `currentBalance`: predpokladá sa, že toto je zostatok po poslednej
+ * transakcii vo vyšší zobrazenom poradí.
+ */
 export function buildTimeline(state: CashflowAppState): CashflowTimelinePoint[] {
-  const today = dateToLocalISO(new Date());
-  const future = state.transactions
-    .filter((t) => isCountedForCashflow(t) && t.date >= today)
-    .slice()
+  const sortedAsc = [...state.transactions]
+    .filter((t) => isCountedForCashflow(t))
     .sort((a, b) => {
       const d = a.date.localeCompare(b.date);
       if (d !== 0) return d;
@@ -372,20 +374,22 @@ export function buildTimeline(state: CashflowAppState): CashflowTimelinePoint[] 
       return a.id.localeCompare(b.id);
     });
 
-  let balance = roundMoney(state.currentBalance);
-  const pts: CashflowTimelinePoint[] = [];
+  let bal = roundMoney(state.currentBalance);
+  const rev: CashflowTimelinePoint[] = [];
 
-  for (const t of future) {
-    balance = roundMoney(balance + deltaForTxn(t));
+  for (let i = sortedAsc.length - 1; i >= 0; i--) {
+    const t = sortedAsc[i];
     const sign = t.direction === "income" ? "+" : "−";
-    pts.push({
+    rev.push({
       date: t.date,
+      transactionId: t.id,
       label: `${sign}${t.amount.toLocaleString("sk-SK")} € · ${t.title}`,
-      balanceAfter: balance,
+      balanceAfter: bal,
     });
+    bal = roundMoney(bal - deltaForTxn(t));
   }
 
-  return pts;
+  return rev.reverse();
 }
 
 export function evaluateRiskWarnings(state: CashflowAppState): RiskWarning[] {

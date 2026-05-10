@@ -13,8 +13,9 @@ export function CashflowTimeline({ state }: Props) {
     <section className="omega-panel">
       <h2 className="omega-h2">Časová os / kalendár</h2>
       <p className="omega-muted">
-        Od dátumu „dnes“ dopredu: zobrazené sú transakcie a projekcia zostatku po
-        každej udalosti.
+        Celý ledger (bez dátového rezania). Hodnota „zostatok po“ je dopočítaná spätne od
+        zadaného aktuálneho zostatku aplikácie — predstavuje rozvrh po každej transakcii vo
+        zobrazenom poradí, nie výpis z účtu.
       </p>
       {points.length === 0 ? (
         <p className="rounded-3xl border border-dashed border-white/15 px-6 py-12 text-center text-sm text-slate-500">
@@ -24,7 +25,7 @@ export function CashflowTimeline({ state }: Props) {
         <ul className="divide-y divide-white/10 overflow-hidden rounded-3xl border border-white/10 bg-black/20">
           {points.map((p) => (
             <li
-              key={`${p.date}-${p.label}`}
+              key={p.transactionId ?? `${p.date}-${p.label}`}
               className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-6"
             >
               <time

@@ -275,10 +275,10 @@ export function App() {
   }, [tab]);
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden md:flex-row">
       <aside
         aria-label="Primárna navigácia"
-        className="hidden shrink-0 border-r border-white/10 bg-slate-950/95 backdrop-blur-sm md:flex md:w-56 md:flex-col lg:w-64"
+        className="hidden h-[100dvh] shrink-0 border-r border-white/10 bg-slate-950/95 backdrop-blur-sm scrollbar-omega md:flex md:w-56 md:flex-col md:overflow-y-auto lg:w-64"
       >
         <div className="border-b border-white/10 px-6 py-8">
           <p className="omega-eyebrow mb-0">Omega</p>
@@ -294,8 +294,8 @@ export function App() {
         </nav>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/90 backdrop-blur-md md:hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-slate-950/90 backdrop-blur-md md:hidden">
           <header className="flex items-start justify-between gap-3 px-4 py-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.35em] text-indigo-400">
@@ -314,7 +314,7 @@ export function App() {
           </nav>
         </div>
 
-        <main className="scrollbar-omega flex-1 p-4 pb-10 md:p-8">
+        <main className="scrollbar-omega min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-10 md:p-8">
           <div className="mx-auto max-w-4xl xl:max-w-5xl">
             {tab === "dashboard" && (
               <Dashboard

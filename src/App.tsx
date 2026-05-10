@@ -118,6 +118,28 @@ export function App() {
     });
   }, [state.transactions]);
 
+  /** Porovnanie počtov — šablóny nemajú 1 : 1 zodpovednosť počtu zápisov v žurnáli. */
+  const ledgerVersusRecurringFootnote = useMemo(() => {
+    const recurring = state.recurringMovements ?? [];
+    const activeIds = new Set(
+      recurring.filter((r) => r.active).map((r) => r.id),
+    );
+    let recurringWithFulfillmentTxn = 0;
+    const seenLinked = new Set<string>();
+    for (const t of state.transactions) {
+      const id = t.fulfillsRecurringMovementId;
+      if (!id || !activeIds.has(id) || seenLinked.has(id)) continue;
+      seenLinked.add(id);
+      recurringWithFulfillmentTxn++;
+    }
+    return {
+      recurringTotal: recurring.length,
+      recurringActive: activeIds.size,
+      ledgerRows: state.transactions.length,
+      recurringWithFulfillmentTxn,
+    };
+  }, [state.recurringMovements, state.transactions]);
+
   useEffect(() => {
     saveState(state);
   }, [state]);
@@ -340,9 +362,26 @@ export function App() {
                   <div>
                     <h2 className="omega-h2 mb-2">Transakcie</h2>
                     <p className="text-sm text-slate-400">
-                      Úplný zoznam uložených položiek bez obmedzenia počtom. Vybraný mesiac na karte{" "}
-                      <span className="text-slate-300">Prehľad</span> výpočet hotovosti nemení — táto obrazovka
-                      slúži na prehľad a údržbu všetkých pohybov naraz.
+                      Položky v Opakované sú mesačné šablóny; tu pod tým sú len pohyby, ktoré zámerne zapíšeš —
+                      aplikácia za každú šablónu sama nevytvára mesačný riadok. Prehľad šablóny používa v mesačnom
+                      výpočte aj bez zápisu tu. Aktívnych šablón{" "}
+                      <span className="tabular-nums text-slate-300">
+                        {ledgerVersusRecurringFootnote.recurringActive}
+                      </span>{" "}
+                      (naraz evidovaných{" "}
+                      <span className="tabular-nums text-slate-300">
+                        {ledgerVersusRecurringFootnote.recurringTotal}
+                      </span>
+                      ); riadkov v žurnáli{" "}
+                      <span className="tabular-nums text-slate-300">
+                        {ledgerVersusRecurringFootnote.ledgerRows}
+                      </span>
+                      ; počet aktívnych šablón, ktoré už majú niekedy prepojený zápis v žurnáli (akákoľvek
+                      dátum):{" "}
+                      <span className="tabular-nums text-slate-300">
+                        {ledgerVersusRecurringFootnote.recurringWithFulfillmentTxn}
+                      </span>
+                      .
                     </p>
                   </div>
                   <button

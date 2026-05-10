@@ -250,9 +250,11 @@ export function RecurringMovementPanel({ state, onUpsert, onDelete }: Props) {
     <section className="omega-panel">
       <h2 className="omega-h2">Opakované položky (mesačný plán)</h2>
       <p className="omega-muted mb-8">
-        Pravidelný pohyb zadávaj ako šablónu — motor automaticky zarátava výšku mesiac čo mesiac do
-        Prehľadu, kým v danom kalendárnom mesiaci nepridáš transakciu prepojenú s touto položkou (
-        formulár → Opakovanie / prepojenie). Jednorazové pohyby nechávaj bez šablóny.
+        Pravidelný pohyb tu vytváraš ako šablónu — automaticky vstupuje do mesačného počtu na karte{" "}
+        Prehľad, ale sama o sebe nekopíruje počet riadkov na karte{" "}
+        Transakcie. Tam sú iba pohyby, ktoré doplníš (jednorázovo, „mesačne“ pri prvom zapise, alebo ako
+        prepojený zápis k šablóne za mesiac). Kým šablóna nemá vlastný realizovaný zápis, motor ju v Prehľade
+        zarátava ako plán bez duplicity s knihou zápisov.
       </p>
 
       {(incOpts.length === 0 || expOpts.length === 0) && (
